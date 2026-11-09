@@ -62,8 +62,10 @@ export function edaClientEntries(opts: EdaClientLookupOptions = {}): Array<EdaCl
 		if (path && !entries.some(e => e.path === path))
 			entries.push({ path, source });
 	};
-	if (env.PCBP_EDA_DIR)
+	if (env.PCBP_EDA_DIR) {
 		push(env.PCBP_EDA_DIR, 'env');
+		return entries;
+	}
 	for (const dir of staticDirs(platform, env, home))
 		push(dir, 'dir');
 	for (const dir of pathDirs(env, platform, exists))

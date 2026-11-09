@@ -14,6 +14,12 @@ v0.1 的 README 路线图第 1 项是「macOS / Linux 支持」。本次升级�
 - 扩展 API 与「允许外部交互」是 Electron 客户端里的同一套实现，三平台一致；`eda.sys_WebSocket` 出连模型不变。
 - 已知平台差异提醒：在线模式与半离线模式的扩展存储互不共用，切模式后需重新导入 .eext 并重新填 token（文档要写，代码不处理）。
 
+### 2.1 本机实测（2026-11-09，升级前 v0.1 代码）
+
+- `%LOCALAPPDATA%\Programs\lceda-pro` **不存在**；真实安装位置是 `C:\Program Files\lceda-pro`（内含 `lceda-pro.exe`）。→ v0.1 的 doctor 在开发机自己上都报假红灯，设计文档第 2 节那条「本机已装于 %LOCALAPPDATA%」是过时观察。
+- `lceda-pro` 与 `lceda-pro.exe` 已出现在 PATH 中（`/c/Program Files/lceda-pro/lceda-pro`）→ 官方安装器确实把命令目录加入 PATH，**PATH 探测在 Windows 上也成立**，三平台可用同一信号兜底。
+- 结论：候选表（LOCALAPPDATA → PROGRAMFILES → PROGRAMFILES(X86) → PATH）比单一硬编码路径更正确，本次升级顺带修掉这个假阴性。
+
 ## 3. 目标
 
 - XG1：CI 矩阵 `windows-latest / macos-latest / ubuntu-latest` 全绿；产物仍只打包一次（.eext 与 tgz 是平台中立的）。

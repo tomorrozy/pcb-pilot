@@ -4,14 +4,26 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DaemonClient } from '../daemon/client.js';
 import { getPaths } from '../daemon/paths.js';
+import { findEdaClient, platformNotes } from '../platform.js';
 import { defaultTargets, installSkill, registrationSnippets } from './install.js';
 
 export interface CommandOptions {
 	homeDir?: string;
 	userHome?: string;
 	env?: NodeJS.ProcessEnv;
+	platform?: NodeJS.Platform;
 	log?: (line: string) => void;
 }
+
+type CheckLevel = 'ok' | 'warn' | 'fail';
+
+interface Check {
+	level: CheckLevel;
+	label: string;
+	hint?: string;
+}
+
+const MARKS: Record<CheckLevel, string> = { ok: '✓', warn: '!', fail: '✗' };
 
 function skillSource(): string {
 	return fileURLToPath(new URL('../../skill', import.meta.url));
@@ -39,43 +51,45 @@ export async function runStatus(opts: CommandOptions = {}): Promise<number> {
 export async function runDoctor(opts: CommandOptions = {}): Promise<number> {
 	const log = opts.log ?? console.log;
 	const env = opts.env ?? process.env;
+	const platform = opts.platform ?? process.platform;
 	const userHome = opts.userHome ?? homedir();
 	const paths = getPaths(opts.homeDir);
-	const results: Array<{ ok: boolean; label: string; hint?: string }> = [];
+	const results: Array<Check> = [];
 
 	const nodeParts = process.versions.node.split('.').map(Number);
 	const nodeOk = nodeParts[0] > 20 || (nodeParts[0] === 20 && nodeParts[1] >= 17);
-	results.push({ ok: nodeOk, label: `Node.js ${process.versions.node} (要求 >= 20.17)`, hint: nodeOk ? undefined : '升级 Node.js 到 20.17 以上' });
+	results.push({ level: nodeOk ? 'ok' : 'fail', label: `Node.js ${process.versions.node} (要求 >= 20.17)`, hint: nodeOk ? undefined : '升级 Node.js 到 20.17 以上' });
 
-	if (process.platform === 'win32') {
-		const edaDir = env.PCBP_EDA_DIR ?? join(env.LOCALAPPDATA ?? '', 'Programs', 'lceda-pro');
-		results.push({ ok: existsSync(edaDir), label: `嘉立创EDA专业版客户端目录存在`, hint: `未找到 ${edaDir}；安装专业版客户端或设置 PCBP_EDA_DIR` });
-	}
-	else {
-		results.push({ ok: true, label: '非 Windows 平台，跳过 EDA 客户端路径检查' });
-	}
+	const eda = findEdaClient({ platform, env, home: userHome });
+	results.push(eda.found
+		? { level: 'ok', label: `EDA客户端 ${eda.path}（来源 ${eda.source}）` }
+		: {
+			level: 'warn',
+			label: 'EDA客户端 未探测到（扩展连上即视为可用，不影响 agent 链路）',
+			hint: `候选 ${eda.candidates.slice(0, 4).join(' | ')}；${platformNotes(platform)}`,
+		});
 
 	let daemonStatus: Awaited<ReturnType<DaemonClient['status']>> | undefined;
 	try {
 		daemonStatus = await new DaemonClient({ homeDir: opts.homeDir }).status();
-		results.push({ ok: true, label: 'daemon 运行中' });
+		results.push({ level: 'ok', label: 'daemon 运行中' });
 	}
 	catch {
-		results.push({ ok: false, label: 'daemon 未运行', hint: '运行 pcb-pilot start 启动 daemon' });
+		results.push({ level: 'fail', label: 'daemon 未运行', hint: '运行 pcb-pilot start 启动 daemon' });
 	}
 
 	results.push({
-		ok: daemonStatus?.extensionConnected === true,
+		level: daemonStatus?.extensionConnected === true ? 'ok' : 'fail',
 		label: 'EDA 扩展已连接 daemon',
 		hint: daemonStatus?.extensionConnected ? undefined : 'EDA 中安装 .eext、开启「允许外部交互」，菜单 PCB Pilot → 设置 Token 后重连',
 	});
-	results.push({ ok: existsSync(paths.tokenFile), label: `配对 token 存在 (${paths.tokenFile})`, hint: '启动 daemon 会自动生成 token' });
+	results.push({ level: existsSync(paths.tokenFile) ? 'ok' : 'fail', label: `配对 token 存在 (${paths.tokenFile})`, hint: existsSync(paths.tokenFile) ? undefined : '启动 daemon 会自动生成 token' });
 	const installed = defaultTargets(userHome).filter(t => existsSync(join(t.dir, 'SKILL.md')));
-	results.push({ ok: installed.length > 0, label: 'Agent Skill 已安装', hint: '运行 pcb-pilot install 安装 Skill 到 Claude Code / Codex / Qoder' });
+	results.push({ level: installed.length > 0 ? 'ok' : 'fail', label: 'Agent Skill 已安装', hint: installed.length > 0 ? undefined : '运行 pcb-pilot install 安装 Skill 到 Claude Code / Codex / Qoder' });
 
 	for (const r of results) {
-		log(`${r.ok ? '✓' : '✗'} ${r.label}`);
-		if (!r.ok && r.hint)
+		log(`${MARKS[r.level]} ${r.label}`);
+		if (r.hint)
 			log(`    → ${r.hint}`);
 	}
 	log('');
@@ -84,7 +98,9 @@ export async function runDoctor(opts: CommandOptions = {}): Promise<number> {
 	log('  2. 打开「允许外部交互」');
 	log('  3. 菜单 PCB Pilot → 设置 Token（pcb-pilot status 会显示 token 路径）');
 	log('  4. 打开原理图或 PCB 文档后执行菜单「重连」');
-	return results.every(r => r.ok) ? 0 : 1;
+	log('');
+	log(platformNotes(platform));
+	return results.some(r => r.level === 'fail') ? 1 : 0;
 }
 
 export async function runInstall(opts: CommandOptions = {}): Promise<number> {

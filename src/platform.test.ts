@@ -16,6 +16,13 @@ it('PCBP_EDA_DIR 优先且标记为 env 来源', () => {
 	expect(r.source).toBe('env');
 });
 
+it('PCBP_EDA_DIR 指定后不再回退到其他候选', () => {
+	const dir = join('?', 'nope');
+	const binDir = join('?', 'some', 'bin');
+	const list = edaClientCandidates({ platform: 'linux', env: { PCBP_EDA_DIR: dir, PATH: binDir }, home: HOME, ...fsOf([join(binDir, 'lceda-pro')]) });
+	expect(list).toEqual([dir]);
+});
+
 it('win32 候选含 LOCALAPPDATA 与 Program Files 两种安装位置，不含 POSIX 目录', () => {
 	const local = join('C:', 'Users', 'me', 'AppData', 'Local');
 	const pf = join('C:', 'Program Files');
