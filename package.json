@@ -35,7 +35,9 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"typecheck": "tsc --noEmit",
-		"test": "vitest run"
+		"test": "vitest run",
+		"check:bin": "node scripts/check-bin-eol.mjs",
+		"prepublishOnly": "npm run build && npm run check:bin"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.12.0",
