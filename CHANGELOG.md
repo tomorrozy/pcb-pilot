@@ -2,7 +2,7 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；版本号遵循 SemVer。
 
-## [0.2.0] - 未发布
+## [0.2.0] - 2026-11-09
 
 跨平台升级版：Windows / macOS / Linux 共用一套 daemon、CLI 与 MCP 适配器。
 
