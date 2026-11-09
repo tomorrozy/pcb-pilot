@@ -14,7 +14,7 @@ export async function startDaemon(opts?: { homeDir?: string; env?: NodeJS.Proces
 	const config = loadConfig(paths, opts?.env);
 	const token = loadOrCreateToken(paths);
 	const audit = new AuditLogger(paths.auditFile);
-	const bridge = new ExtensionBridge({ port: config.wsPort, token, audit });
+	const bridge = new ExtensionBridge({ port: config.wsPort, token, audit, outputDir: paths.outputDir });
 	const wsPort = await bridge.start();
 	let stopped = false;
 	const stop = async (): Promise<void> => {

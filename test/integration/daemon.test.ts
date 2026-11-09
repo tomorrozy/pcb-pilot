@@ -18,7 +18,7 @@ afterEach(async () => {
 async function setup(opts?: { timeouts?: Record<string, number> }) {
 	const paths = getPaths(mkdtempSync(join(tmpdir(), 'pcbp-')));
 	const audit = new AuditLogger(paths.auditFile);
-	const bridge = new ExtensionBridge({ port: 0, token: 'right-token', audit, ...opts });
+	const bridge = new ExtensionBridge({ port: 0, token: 'right-token', audit, outputDir: paths.outputDir, ...opts });
 	const port = await bridge.start();
 	cleanups.push(() => bridge.stop());
 	return { paths, audit, bridge, url: `ws://127.0.0.1:${port}` };
@@ -144,6 +144,29 @@ it('8MB 大结果 roundtrip 完整', async () => {
 	const res = await bridge.dispatch('sch.listNets', {});
 	expect(res.ok).toBe(true);
 	expect((res.result as { data: string }).data.length).toBe(big.length);
+});
+
+it('output.* 结果落盘，响应只回 path 不含 base64', async () => {
+	const { paths, bridge, url } = await setup();
+	const mock = await connectMock(url);
+	mock.onAction(async () => ({ ok: true, result: { fileName: 'gerber.zip', base64: Buffer.from('ZIPDATA').toString('base64'), sizeBytes: 7 } }));
+	const res = await bridge.dispatch('output.gerber', {});
+	expect(res.ok).toBe(true);
+	const out = res.result as { path: string; sizeBytes: number };
+	expect(out.sizeBytes).toBe(7);
+	expect(out.path).toBe(join(paths.outputDir, 'gerber.zip'));
+	expect((res.result as Record<string, unknown>).base64).toBeUndefined();
+	expect(readFileSync(out.path).toString()).toBe('ZIPDATA');
+});
+
+it('output.* 文件名防目录穿越', async () => {
+	const { paths, bridge, url } = await setup();
+	const mock = await connectMock(url);
+	mock.onAction(async () => ({ ok: true, result: { fileName: '..\\..\\evil.zip', base64: 'AAAA', sizeBytes: 3 } }));
+	const res = await bridge.dispatch('output.gerber', {});
+	expect(res.ok).toBe(true);
+	expect((res.result as { path: string }).path.startsWith(paths.outputDir)).toBe(true);
+	expect((res.result as { path: string }).path.endsWith('evil.zip')).toBe(true);
 });
 
 it('RPC status/action/shutdown', async () => {

@@ -1,6 +1,9 @@
 import type { EdaApi } from './eda-api';
 import { libraryActions } from './actions/library';
+import { outputActions } from './actions/output';
+import { pcbActions } from './actions/pcb';
 import { projectActions } from './actions/project';
+import { schActions } from './actions/sch';
 import { visionActions } from './actions/vision';
 
 export type ActionHandler = (params: any) => Promise<{ result: unknown; readback?: unknown }>;
@@ -15,6 +18,9 @@ export function createDispatcher(eda: EdaApi): (action: string, params: any) => 
 		...projectActions(eda),
 		...libraryActions(eda),
 		...visionActions(eda),
+		...schActions(eda),
+		...pcbActions(eda),
+		...outputActions(eda),
 	};
 	return async (action: string, params: any) => {
 		const handler = handlers[action];

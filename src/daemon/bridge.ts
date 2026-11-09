@@ -1,4 +1,6 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
 import { getActionDef } from '../protocol/actions.js';
 import type { ActionResponse, ErrorCode } from '../protocol/types.js';
@@ -35,7 +37,7 @@ export class ExtensionBridge {
 	private sweepTimer: NodeJS.Timeout | undefined;
 	private actualPort = 0;
 
-	constructor(private readonly opts: { port: number; token: string; audit: AuditLogger; timeouts?: Record<string, number> }) {}
+	constructor(private readonly opts: { port: number; token: string; audit: AuditLogger; outputDir: string; timeouts?: Record<string, number> }) {}
 
 	start(): Promise<number> {
 		return new Promise((resolve, reject) => {
@@ -115,6 +117,8 @@ export class ExtensionBridge {
 				else if (this.projectUuid !== uuid)
 					return finish({ type: 'result', id, ok: false, error: { code: 'READBACK_MISMATCH', message: `project changed: expected ${this.projectUuid}, got ${uuid}` } });
 			}
+			if (response.ok && action.startsWith('output.'))
+				this.spillOutputFile(response);
 			return finish(response);
 		};
 		const chained = this.tail.then(job, job);
@@ -178,6 +182,18 @@ export class ExtensionBridge {
 			}
 		});
 		ws.on('error', () => {});
+	}
+
+	private spillOutputFile(response: ActionResponse): void {
+		const r = response.result as { fileName?: unknown; base64?: unknown; sizeBytes?: unknown } | undefined;
+		if (!r || typeof r.base64 !== 'string' || typeof r.fileName !== 'string')
+			return;
+		const safeName = basename(r.fileName.replace(/\\/g, '/'));
+		const outPath = join(this.opts.outputDir, safeName);
+		mkdirSync(this.opts.outputDir, { recursive: true });
+		const bytes = Buffer.from(r.base64, 'base64');
+		writeFileSync(outPath, bytes);
+		response.result = { path: outPath, sizeBytes: typeof r.sizeBytes === 'number' ? r.sizeBytes : bytes.byteLength };
 	}
 
 	private dropExtension(code: 'NOT_CONNECTED', message: string): void {
