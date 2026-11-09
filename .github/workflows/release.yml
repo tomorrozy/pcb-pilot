@@ -8,22 +8,52 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            extension/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix extension
+      - run: npx vitest run
+      - run: npm test --prefix extension
+      - run: npm run build
+      - run: npm run check:bin
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            extension/package-lock.json
       - run: npm ci
       - run: npm ci --prefix extension
       - run: npm run build
-      - run: npx vitest run
-      - run: npm test --prefix extension
+      - run: npm run check:bin
       - run: npm run build --prefix extension
-      - name: Pack npm tarball
-        run: npm pack
+      - run: npm pack
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

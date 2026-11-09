@@ -7,13 +7,23 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            extension/package-lock.json
       - name: Install root deps
         run: npm ci
       - name: Install extension deps
@@ -28,16 +38,27 @@ jobs:
           npm test --prefix extension
       - name: Build package
         run: npm run build
+      - name: Verify bin shebang is LF-clean
+        run: npm run check:bin
       - name: Build .eext
         run: npm run build --prefix extension
+      - name: Assert tarball contents
+        run: |
+          npm pack --dry-run 2>&1 | tee pack-list.txt
+          if grep -q "package/extension/" pack-list.txt; then
+            echo "npm tarball must not contain extension/"
+            exit 1
+          fi
+      - name: Pack npm tarball
+        run: npm pack
       - name: Upload .eext
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: pcb-pilot-eext
           path: extension/build/dist/*.eext
-      - name: Pack npm tarball
-        run: npm pack
       - name: Upload npm tarball
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: pcb-pilot-npm
