@@ -64,6 +64,52 @@ it('15s 无 pong → close 并重连', async () => {
 	}
 });
 
+it('token 以 getter 提供时重连使用新 token', async () => {
+	vi.useFakeTimers();
+	try {
+		const socket = stubSocket();
+		let token = 'tok-1';
+		const client = new BridgeClient(stubEda(socket.sys_WebSocket), { url: 'ws://x', token: () => token, version: '0.1.0' });
+		client.start();
+		await socket.calls[0].onConnected();
+		expect(JSON.parse(socket.sent[0]).token).toBe('tok-1');
+		token = 'tok-2';
+		await vi.advanceTimersByTimeAsync(5000);
+		await vi.advanceTimersByTimeAsync(15000);
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(socket.calls.length).toBe(2);
+		await socket.calls[1].onConnected();
+		expect(JSON.parse(socket.sent[socket.sent.length - 1]).token).toBe('tok-2');
+		client.stop();
+	}
+	finally {
+		vi.useRealTimers();
+	}
+});
+
+it('动作执行中 pong 超时不重连', async () => {
+	vi.useFakeTimers();
+	try {
+		const socket = stubSocket();
+		const eda = stubEda(socket.sys_WebSocket);
+		let release: (v: unknown) => void = () => {};
+		(eda.lib_Device.search as ReturnType<typeof vi.fn>).mockImplementation(() => new Promise((r) => { release = r; }));
+		const client = new BridgeClient(eda, { url: 'ws://x', token: 't', version: '0.1.0' });
+		client.start();
+		await socket.calls[0].onConnected();
+		const pending = socket.calls[0].onMessage({ data: JSON.stringify({ type: 'action', id: 'a1', action: 'library.searchDevice', params: { key: 'x' } }) });
+		await vi.advanceTimersByTimeAsync(6000);
+		await vi.advanceTimersByTimeAsync(20000);
+		expect(socket.calls.length).toBe(1);
+		release([{ uuid: 'd' }]);
+		await pending;
+		client.stop();
+	}
+	finally {
+		vi.useRealTimers();
+	}
+});
+
 it('pong 重置超时，不重连', async () => {
 	vi.useFakeTimers();
 	try {

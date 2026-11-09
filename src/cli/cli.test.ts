@@ -44,6 +44,7 @@ it('runStatus 无 daemon 时 exit 1', async () => {
 	const code = await runStatus({ homeDir: join(home, '.pcb-pilot'), log: s => logs.push(s) });
 	expect(code).toBe(1);
 	expect(logs.join('\n')).toContain('daemon');
+	expect(logs.join('\n')).toContain(join(home, '.pcb-pilot', 'token'));
 });
 
 it('runDoctor 在 daemon 未运行时给出 start 建议', async () => {

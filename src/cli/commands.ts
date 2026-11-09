@@ -19,16 +19,19 @@ function skillSource(): string {
 
 export async function runStatus(opts: CommandOptions = {}): Promise<number> {
 	const log = opts.log ?? console.log;
+	const paths = getPaths(opts.homeDir);
 	try {
 		const status = await new DaemonClient({ homeDir: opts.homeDir }).status();
 		log(`✓ daemon 运行中 (pid ${status.pid}) rpc=${status.rpcPort} ws=${status.wsPort}`);
 		log(`${status.extensionConnected ? '✓' : '✗'} EDA 扩展${status.extensionConnected ? '已连接' : '未连接'}${status.extensionVersion ? ` v${status.extensionVersion}` : ''}`);
 		if (status.projectUuid)
 			log(`  当前工程: ${status.projectUuid}`);
+		log(`  配对 token: ${paths.tokenFile}`);
 		return status.extensionConnected ? 0 : 1;
 	}
 	catch {
 		log('✗ daemon 未运行：先运行 pcb-pilot start（或在 EDA 里重连扩展前启动）');
+		log(`  配对 token: ${paths.tokenFile}（daemon 首次启动后生成）`);
 		return 1;
 	}
 }

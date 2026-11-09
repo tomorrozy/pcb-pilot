@@ -4,17 +4,21 @@ import { BridgeClient } from './ws-client';
 let client: BridgeClient | undefined;
 let lastStatus = 'disconnected';
 
-export function activate(): void {
+function createClient(): BridgeClient {
 	const url = (eda.sys_Storage.getExtensionUserConfig('pcbPilot.url') as string | undefined) ?? 'ws://127.0.0.1:49630';
-	const token = (eda.sys_Storage.getExtensionUserConfig('pcbPilot.token') as string | undefined) ?? '';
-	client = new BridgeClient(eda, {
+	const created = new BridgeClient(eda, {
 		url,
-		token,
+		token: () => (eda.sys_Storage.getExtensionUserConfig('pcbPilot.token') as string | undefined) ?? '',
 		version: extensionConfig.version,
 		onStatus: (status) => {
 			lastStatus = status;
 		},
 	});
+	return created;
+}
+
+export function activate(): void {
+	client = createClient();
 	client.start();
 }
 
@@ -42,7 +46,8 @@ export function setToken(): void {
 		(value) => {
 			void eda.sys_Storage.setExtensionUserConfig('pcbPilot.token', String(value ?? '').trim()).then(() => {
 				client?.stop();
-				client?.start();
+				client = createClient();
+				client.start();
 				eda.sys_Dialog.showInformationMessage('Token 已保存，正在重连 daemon…', 'PCB Pilot');
 			});
 		},

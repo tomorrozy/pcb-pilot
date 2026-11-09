@@ -33,11 +33,12 @@ export class ExtensionBridge {
 	private readonly pending = new Map<string, Pending>();
 	private tail: Promise<unknown> = Promise.resolve();
 	private projectUuid: string | undefined;
+	private blocked: string | undefined;
 	private lastSeen = 0;
 	private sweepTimer: NodeJS.Timeout | undefined;
 	private actualPort = 0;
 
-	constructor(private readonly opts: { port: number; token: string; audit: AuditLogger; outputDir: string; timeouts?: Record<string, number> }) {}
+	constructor(private readonly opts: { port: number; token: string; audit: AuditLogger; outputDir: string; timeouts?: Record<string, number>; sweepIntervalMs?: number; livenessTimeoutMs?: number }) {}
 
 	start(): Promise<number> {
 		return new Promise((resolve, reject) => {
@@ -49,9 +50,11 @@ export class ExtensionBridge {
 				const addr = wss.address();
 				this.actualPort = typeof addr === 'object' && addr ? addr.port : this.opts.port;
 				this.sweepTimer = setInterval(() => {
-					if (this.extension && Date.now() - this.lastSeen > 20000)
+					if (this.pending.size > 0)
+						return;
+					if (this.extension && Date.now() - this.lastSeen > (this.opts.livenessTimeoutMs ?? 20000))
 						this.extension.terminate();
-				}, 10000);
+				}, this.opts.sweepIntervalMs ?? 10000);
 				this.sweepTimer.unref();
 				resolve(this.actualPort);
 			});
@@ -98,6 +101,8 @@ export class ExtensionBridge {
 		const job = async (): Promise<ActionResponse> => {
 			if (!this.getStatus().extensionConnected)
 				return fail('NOT_CONNECTED', 'no EDA extension connected');
+			if (def.write && this.blocked)
+				return fail('READBACK_MISMATCH', `writes blocked after READBACK_MISMATCH (${this.blocked}); open a project to resync`);
 			const timeoutMs = this.opts.timeouts?.[action] ?? def.timeoutMs;
 			const response = await new Promise<ActionResponse>((resolve) => {
 				const timer = setTimeout(() => {
@@ -107,15 +112,23 @@ export class ExtensionBridge {
 				this.pending.set(id, { id, resolve, timer });
 				this.extension!.send(JSON.stringify({ type: 'action', id, action, params: parsed.data }));
 			});
+			if (response.ok && (action === 'project.open' || action === 'project.create')) {
+				const uuid = this.readbackUuid(response);
+				if (typeof uuid === 'string') {
+					this.projectUuid = uuid;
+					this.blocked = undefined;
+				}
+			}
 			if (response.ok && def.write) {
-				const rb = response.readback;
-				const uuid = typeof rb === 'object' && rb !== null && 'projectUuid' in rb ? (rb as { projectUuid: unknown }).projectUuid : undefined;
+				const uuid = this.readbackUuid(response);
 				if (typeof uuid !== 'string')
 					return finish({ type: 'result', id, ok: false, error: { code: 'READBACK_MISMATCH', message: 'write action returned no readback.projectUuid' } });
 				if (this.projectUuid === undefined)
 					this.projectUuid = uuid;
-				else if (this.projectUuid !== uuid)
-					return finish({ type: 'result', id, ok: false, error: { code: 'READBACK_MISMATCH', message: `project changed: expected ${this.projectUuid}, got ${uuid}` } });
+				else if (this.projectUuid !== uuid) {
+					this.blocked = `expected ${this.projectUuid}, got ${uuid}`;
+					return finish({ type: 'result', id, ok: false, error: { code: 'READBACK_MISMATCH', message: `project changed: ${this.blocked}` } });
+				}
 			}
 			if (response.ok && action.startsWith('output.'))
 				this.spillOutputFile(response);
@@ -157,6 +170,8 @@ export class ExtensionBridge {
 				greeted = true;
 				this.extension = ws;
 				this.extensionVersion = msg.extensionVersion;
+				this.projectUuid = undefined;
+				this.blocked = undefined;
 				ws.send(JSON.stringify({ type: 'hello-ack', ok: true }));
 				return;
 			}
@@ -184,16 +199,30 @@ export class ExtensionBridge {
 		ws.on('error', () => {});
 	}
 
+	private readbackUuid(response: ActionResponse): unknown {
+		const rb = response.readback;
+		return typeof rb === 'object' && rb !== null && 'projectUuid' in rb ? (rb as { projectUuid: unknown }).projectUuid : undefined;
+	}
+
 	private spillOutputFile(response: ActionResponse): void {
 		const r = response.result as { fileName?: unknown; base64?: unknown; sizeBytes?: unknown } | undefined;
 		if (!r || typeof r.base64 !== 'string' || typeof r.fileName !== 'string')
 			return;
-		const safeName = basename(r.fileName.replace(/\\/g, '/'));
-		const outPath = join(this.opts.outputDir, safeName);
-		mkdirSync(this.opts.outputDir, { recursive: true });
-		const bytes = Buffer.from(r.base64, 'base64');
-		writeFileSync(outPath, bytes);
-		response.result = { path: outPath, sizeBytes: typeof r.sizeBytes === 'number' ? r.sizeBytes : bytes.byteLength };
+		try {
+			let safeName = basename(r.fileName.replace(/\\/g, '/'));
+			if (!safeName || safeName === '.' || safeName === '..' || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(safeName))
+				safeName = `output-${Date.now()}.bin`;
+			const outPath = join(this.opts.outputDir, safeName);
+			mkdirSync(this.opts.outputDir, { recursive: true });
+			const bytes = Buffer.from(r.base64, 'base64');
+			writeFileSync(outPath, bytes);
+			response.result = { path: outPath, sizeBytes: typeof r.sizeBytes === 'number' ? r.sizeBytes : bytes.byteLength };
+		}
+		catch (err) {
+			response.ok = false;
+			response.result = undefined;
+			response.error = { code: 'EDA_API_ERROR', message: `failed to save output file: ${String(err)}` };
+		}
 	}
 
 	private dropExtension(code: 'NOT_CONNECTED', message: string): void {

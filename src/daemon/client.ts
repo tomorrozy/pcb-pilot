@@ -5,6 +5,7 @@ import type { BridgeStatus } from './bridge.js';
 import type { DaemonPaths } from './paths.js';
 import { getPaths } from './paths.js';
 import type { ActionResponse } from '../protocol/types.js';
+import { getActionDef } from '../protocol/actions.js';
 
 export type DaemonStatus = BridgeStatus & { daemonVersion: string; pid: number; rpcPort: number; wsPort: number };
 
@@ -46,12 +47,14 @@ export class DaemonClient {
 	}
 
 	async action(name: string, params: Record<string, unknown> = {}): Promise<ActionResponse> {
+		const timeoutMs = (getActionDef(name)?.timeoutMs ?? 30000) + 5000;
 		try {
-			const res = await this.rpc('action', { action: name, params });
+			const res = await this.rpc('action', { action: name, params }, timeoutMs);
 			return res as unknown as ActionResponse;
 		}
 		catch (err) {
-			return { type: 'result', id: 'unknown', ok: false, error: { code: 'NOT_CONNECTED', message: `daemon unreachable: ${String(err)}` } };
+			const code = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError') ? 'TIMEOUT' : 'NOT_CONNECTED';
+			return { type: 'result', id: 'unknown', ok: false, error: { code, message: `daemon request failed: ${String(err)}` } };
 		}
 	}
 

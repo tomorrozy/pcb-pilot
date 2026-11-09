@@ -14,8 +14,11 @@ export function pcbActions(eda: EdaApi): Record<string, ActionHandler> {
 		'pcb.placeComponent': async (params: { device: { libraryUuid: string; uuid: string }; x: number; y: number; rotation?: number; layer?: string }) => {
 			const layer = layerId(params.layer) as TPCB_LayersOfComponent;
 			const comp = await eda.pcb_PrimitiveComponent.create(params.device, layer, params.x, params.y, params.rotation);
-			const id = comp?.getState_PrimitiveId() ?? null;
-			return { result: { primitiveId: id }, readback: await readback(eda, { primitiveId: id, x: params.x, y: params.y }) };
+			const id = comp?.getState_PrimitiveId();
+			if (!id)
+				throw new Error('placeComponent returned no primitive');
+			const got = await eda.pcb_PrimitiveComponent.get(id);
+			return { result: { primitiveId: id }, readback: await readback(eda, { primitiveId: id, x: got?.getState_X(), y: got?.getState_Y() }) };
 		},
 		'pcb.moveComponent': async (params: { id: string; x?: number; y?: number; rotation?: number; layer?: string }) => {
 			await eda.pcb_PrimitiveComponent.modify(params.id, {
@@ -38,8 +41,11 @@ export function pcbActions(eda: EdaApi): Record<string, ActionHandler> {
 		},
 		'pcb.via': async (params: { net: string; x: number; y: number; holeDiameter?: number; diameter?: number }) => {
 			const via = await eda.pcb_PrimitiveVia.create(params.net, params.x, params.y, params.holeDiameter ?? 0.3, params.diameter ?? 0.6);
-			const id = via?.getState_PrimitiveId() ?? null;
-			return { result: { primitiveId: id }, readback: await readback(eda, { primitiveId: id, x: params.x, y: params.y }) };
+			const id = via?.getState_PrimitiveId();
+			if (!id)
+				throw new Error('via returned no primitive');
+			const got = await eda.pcb_PrimitiveVia.get(id);
+			return { result: { primitiveId: id }, readback: await readback(eda, { primitiveId: id, x: got?.getState_X(), y: got?.getState_Y() }) };
 		},
 		'pcb.delete': async (params: { type: 'component' | 'track' | 'via'; ids: string[] }) => {
 			if (params.type === 'component')

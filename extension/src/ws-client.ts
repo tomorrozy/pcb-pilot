@@ -14,8 +14,9 @@ export class BridgeClient {
 	private backoff = 1000;
 	private stopped = true;
 	private connected = false;
+	private inFlight = 0;
 
-	constructor(private readonly eda: EdaApi, private readonly opts: { url: string; token: string; version: string; onStatus?: (status: ConnectionStatus) => void }) {
+	constructor(private readonly eda: EdaApi, private readonly opts: { url: string; token: string | (() => string); version: string; onStatus?: (status: ConnectionStatus) => void }) {
 		this.dispatcher = createDispatcher(eda);
 	}
 
@@ -56,7 +57,8 @@ export class BridgeClient {
 			return;
 		this.connected = true;
 		this.backoff = 1000;
-		this.send({ type: 'hello', protocolVersion: 1, token: this.opts.token, extensionVersion: this.opts.version });
+		const token = typeof this.opts.token === 'function' ? this.opts.token() : this.opts.token;
+		this.send({ type: 'hello', protocolVersion: 1, token, extensionVersion: this.opts.version });
 		this.startHeartbeat();
 		this.opts.onStatus?.('connected');
 	}
@@ -65,8 +67,14 @@ export class BridgeClient {
 		this.clearTimers();
 		this.pingTimer = setInterval(() => {
 			this.send({ type: 'ping', ts: Date.now() });
-			if (!this.pongTimer)
-				this.pongTimer = setTimeout(() => this.scheduleReconnect(), 15000);
+			if (!this.pongTimer) {
+				this.pongTimer = setTimeout(() => {
+					this.pongTimer = undefined;
+					if (this.inFlight > 0)
+						return;
+					this.scheduleReconnect();
+				}, 15000);
+			}
 		}, 5000);
 	}
 
@@ -85,8 +93,14 @@ export class BridgeClient {
 			return;
 		}
 		if (msg.type === 'action') {
-			const response = await this.dispatch(msg);
-			this.send(response);
+			this.inFlight++;
+			try {
+				const response = await this.dispatch(msg);
+				this.send(response);
+			}
+			finally {
+				this.inFlight--;
+			}
 		}
 	}
 

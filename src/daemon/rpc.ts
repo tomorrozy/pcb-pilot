@@ -17,32 +17,39 @@ export async function createRpcServer(opts: { bridge: ExtensionBridge; version: 
 		req.on('data', c => chunks.push(c as Buffer));
 		req.on('end', () => {
 			void (async () => {
-				let body: { id?: string; method?: string; params?: { action?: string; params?: Record<string, unknown> } };
 				try {
-					body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-				}
-				catch {
+					let body: { id?: string; method?: string; params?: { action?: string; params?: Record<string, unknown> } };
+					try {
+						body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+					}
+					catch {
+						res.statusCode = 400;
+						res.end(JSON.stringify({ ok: false, error: 'invalid json' }));
+						return;
+					}
+					const id = body.id ?? 'unknown';
+					if (body.method === 'status') {
+						res.end(JSON.stringify({ id, ok: true, result: { daemonVersion: opts.version, pid: process.pid, ...opts.bridge.getStatus() } }));
+						return;
+					}
+					if (body.method === 'action' && typeof body.params?.action === 'string') {
+						const result = await opts.bridge.dispatch(body.params.action, body.params.params ?? {});
+						res.end(JSON.stringify({ id, ok: true, result }));
+						return;
+					}
+					if (body.method === 'shutdown') {
+						res.end(JSON.stringify({ id, ok: true }));
+						opts.onShutdown();
+						return;
+					}
 					res.statusCode = 400;
-					res.end(JSON.stringify({ ok: false, error: 'invalid json' }));
-					return;
+					res.end(JSON.stringify({ id, ok: false, error: 'unknown method' }));
 				}
-				const id = body.id ?? 'unknown';
-				if (body.method === 'status') {
-					res.end(JSON.stringify({ id, ok: true, result: { daemonVersion: opts.version, pid: process.pid, ...opts.bridge.getStatus() } }));
-					return;
+				catch (err) {
+					if (!res.headersSent)
+						res.statusCode = 500;
+					res.end(JSON.stringify({ ok: false, error: String(err) }));
 				}
-				if (body.method === 'action' && typeof body.params?.action === 'string') {
-					const result = await opts.bridge.dispatch(body.params.action, body.params.params ?? {});
-					res.end(JSON.stringify({ id, ok: true, result }));
-					return;
-				}
-				if (body.method === 'shutdown') {
-					res.end(JSON.stringify({ id, ok: true }));
-					opts.onShutdown();
-					return;
-				}
-				res.statusCode = 400;
-				res.end(JSON.stringify({ id, ok: false, error: 'unknown method' }));
 			})();
 		});
 	});

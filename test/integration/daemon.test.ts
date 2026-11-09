@@ -15,7 +15,7 @@ afterEach(async () => {
 		await c();
 });
 
-async function setup(opts?: { timeouts?: Record<string, number> }) {
+async function setup(opts?: { timeouts?: Record<string, number>; sweepIntervalMs?: number; livenessTimeoutMs?: number }) {
 	const paths = getPaths(mkdtempSync(join(tmpdir(), 'pcbp-')));
 	const audit = new AuditLogger(paths.auditFile);
 	const bridge = new ExtensionBridge({ port: 0, token: 'right-token', audit, outputDir: paths.outputDir, ...opts });
@@ -167,6 +167,78 @@ it('output.* 文件名防目录穿越', async () => {
 	expect(res.ok).toBe(true);
 	expect((res.result as { path: string }).path.startsWith(paths.outputDir)).toBe(true);
 	expect((res.result as { path: string }).path.endsWith('evil.zip')).toBe(true);
+});
+
+it('project.open/create 成功后刷新 projectUuid 缓存', async () => {
+	const { bridge, url } = await setup();
+	const mock = await connectMock(url);
+	let current = 'p1';
+	mock.onAction(async (req) => {
+		if (req.action === 'project.open' || req.action === 'project.create') {
+			current = 'p2';
+			return { ok: true, result: {}, readback: { projectUuid: 'p2' } };
+		}
+		return { ok: true, result: {}, readback: { projectUuid: current } };
+	});
+	expect((await bridge.dispatch('sch.wire', { points: [[0, 0], [1, 1]] })).ok).toBe(true);
+	expect((await bridge.dispatch('project.open', { projectUuid: 'p2' })).ok).toBe(true);
+	expect(bridge.getStatus().projectUuid).toBe('p2');
+	const after = await bridge.dispatch('sch.wire', { points: [[0, 0], [2, 2]] });
+	expect(after.ok).toBe(true);
+});
+
+it('READBACK_MISMATCH 后锁死写入，project.open 成功可解锁', async () => {
+	const { bridge, url } = await setup();
+	const mock = await connectMock(url);
+	let calls = 0;
+	mock.onAction(async (req) => {
+		calls++;
+		if (req.action === 'project.open')
+			return { ok: true, result: {}, readback: { projectUuid: 'p2' } };
+		return { ok: true, result: {}, readback: { projectUuid: calls === 1 ? 'p1' : 'p2' } };
+	});
+	expect((await bridge.dispatch('sch.wire', { points: [[0, 0], [1, 1]] })).ok).toBe(true);
+	const blocked = await bridge.dispatch('sch.wire', { points: [[0, 0], [2, 2]] });
+	expect(blocked.error?.code).toBe('READBACK_MISMATCH');
+	const callsAfterMismatch = calls;
+	const stillBlocked = await bridge.dispatch('sch.wire', { points: [[0, 0], [3, 3]] });
+	expect(stillBlocked.error?.code).toBe('READBACK_MISMATCH');
+	expect(calls).toBe(callsAfterMismatch);
+	expect((await bridge.dispatch('project.open', { projectUuid: 'p2' })).ok).toBe(true);
+	expect((await bridge.dispatch('sch.wire', { points: [[0, 0], [4, 4]] })).ok).toBe(true);
+});
+
+it('长动作在 pending 期间不被存活清扫杀掉', async () => {
+	const { bridge, url } = await setup({ timeouts: { 'sch.listNets': 2000 }, sweepIntervalMs: 40, livenessTimeoutMs: 80 });
+	const mock = await connectMock(url);
+	mock.onAction(async () => {
+		await new Promise(r => setTimeout(r, 250));
+		return { ok: true, result: { slow: true } };
+	});
+	const res = await bridge.dispatch('sch.listNets', {});
+	expect(res.ok).toBe(true);
+	expect(bridge.getStatus().extensionConnected).toBe(true);
+});
+
+it('output.* 非法文件名回退到安全文件名', async () => {
+	const { paths, bridge, url } = await setup();
+	const mock = await connectMock(url);
+	mock.onAction(async () => ({ ok: true, result: { fileName: '..', base64: 'AAAA', sizeBytes: 3 } }));
+	const res = await bridge.dispatch('output.gerber', {});
+	expect(res.ok).toBe(true);
+	const out = res.result as { path: string };
+	expect(out.path.startsWith(paths.outputDir)).toBe(true);
+	expect(out.path).not.toBe(join(paths.outputDir, '..'));
+});
+
+it('RPC 处理异常时返回 JSON 错误而非挂起', async () => {
+	const fakeBridge = { getStatus: () => ({ extensionConnected: false, pendingCount: 0 }), dispatch: async () => { throw new Error('boom'); } } as unknown as ExtensionBridge;
+	const { server, port } = await createRpcServer({ bridge: fakeBridge, version: '0.1.0', port: 0, onShutdown: () => {} });
+	cleanups.push(() => new Promise<void>(r => server.close(() => r())));
+	const res = await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: '1', method: 'action', params: { action: 'sch.listNets', params: {} } }) });
+	const body = await res.json() as { ok: boolean; error?: string };
+	expect(body.ok).toBe(false);
+	expect(body.error).toContain('boom');
 });
 
 it('RPC status/action/shutdown', async () => {

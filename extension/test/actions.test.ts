@@ -50,7 +50,7 @@ function stubEda() {
 		pcb_PrimitiveComponent: {
 			create: vi.fn().mockResolvedValue({ getState_PrimitiveId: () => 'pc1' }),
 			modify: vi.fn().mockResolvedValue(true),
-			get: vi.fn().mockResolvedValue({ getState_X: () => 1, getState_Y: () => 2 }),
+			get: vi.fn().mockResolvedValue({ getState_X: () => 55, getState_Y: () => 66 }),
 			delete: vi.fn().mockResolvedValue(true),
 			getAll: vi.fn().mockResolvedValue([{ getState_PrimitiveId: () => 'pc1' }]),
 		},
@@ -61,6 +61,7 @@ function stubEda() {
 		},
 		pcb_PrimitiveVia: {
 			create: vi.fn().mockResolvedValue({ getState_PrimitiveId: () => 'via1' }),
+			get: vi.fn().mockResolvedValue({ getState_X: () => 7, getState_Y: () => 8 }),
 			delete: vi.fn().mockResolvedValue(true),
 			getAll: vi.fn().mockResolvedValue([]),
 		},
@@ -135,6 +136,15 @@ it('pcb.drc 与 sch.drc 调 check(false,false,true)', async () => {
 	expect(eda.pcb_Drc.check).toHaveBeenCalledWith(false, false, true);
 	await dispatch('sch.drc', {});
 	expect(eda.sch_Drc.check).toHaveBeenCalledWith(false, false, true);
+});
+
+it('pcb.placeComponent/via readback 来自重新读取', async () => {
+	const eda = stubEda();
+	const dispatch = createDispatcher(eda);
+	const placed = await dispatch('pcb.placeComponent', { device: { libraryUuid: 'l', uuid: 'd' }, x: 1, y: 2 });
+	expect(placed.readback).toMatchObject({ x: 55, y: 66 });
+	const via = await dispatch('pcb.via', { net: 'GND', x: 1, y: 2 });
+	expect(via.readback).toMatchObject({ x: 7, y: 8 });
 });
 
 it('output.gerber 返回 fileName/base64/sizeBytes', async () => {

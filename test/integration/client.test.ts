@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, expect, it } from 'vitest';
 import { DaemonClient } from '../../src/daemon/client.js';
+import { startDaemon } from '../../src/daemon/main.js';
+import { MockEdaClient } from '../mock-eda.js';
 
 let pid: number | undefined;
 
@@ -71,3 +73,25 @@ it('ensureDaemon 拉起真实 daemon 并返回 status', async () => {
 	const audit = readFileSync(join(homeDir, 'audit.jsonl'), 'utf8').trim().split('\n');
 	expect(JSON.parse(audit[audit.length - 1]).action).toBe('sch.listNets');
 });
+
+it('长动作（>5s）客户端不中途超时', async () => {
+	const homeDir = mkdtempSync(join(tmpdir(), 'pcbp-long-'));
+	const daemon = await startDaemon({ homeDir, env: { PCBP_WS_PORT: '0', PCBP_RPC_PORT: '0' } as NodeJS.ProcessEnv });
+	try {
+		const token = readFileSync(join(homeDir, 'token'), 'utf8').trim();
+		const mock = new MockEdaClient(`ws://127.0.0.1:${daemon.config.wsPort}`, token);
+		await mock.connect();
+		mock.onAction(async () => {
+			await new Promise(r => setTimeout(r, 5500));
+			return { ok: true, result: { slow: true } };
+		});
+		const client = new DaemonClient({ homeDir });
+		const res = await client.action('output.gerber');
+		expect(res.ok).toBe(true);
+		expect((res.result as { slow: boolean }).slow).toBe(true);
+		mock.close();
+	}
+	finally {
+		await daemon.stop();
+	}
+}, 15000);
