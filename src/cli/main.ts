@@ -37,8 +37,8 @@ program.command('status').description('查看 daemon 与 EDA 扩展状态').acti
 	process.exitCode = await runStatus();
 });
 
-program.command('doctor').description('环境自检').action(async () => {
-	process.exitCode = await runDoctor();
+program.command('doctor').description('环境自检').option('--fix', '自动修复可修复项（生成 token、安装 Skill、启动 daemon）').action(async (opts: { fix?: boolean }) => {
+	process.exitCode = await runDoctor({ fix: opts.fix });
 });
 
 program.command('install').description('安装 Agent Skill 并打印 MCP 注册命令').action(async () => {

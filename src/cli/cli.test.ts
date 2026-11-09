@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
+import { DaemonClient } from '../daemon/client.js';
 import { runDoctor, runStatus, runStop } from './commands.js';
 import { defaultTargets, installSkill, registrationSnippets } from './install.js';
 
@@ -109,6 +110,43 @@ it('runStop：陈旧 pidfile 要说清是「清理」而不是「已停止」', 
 	expect(logs.join('\n')).toContain('陈旧');
 	expect(existsSync(file)).toBe(false);
 });
+
+it('runDoctor --fix 生成 token、安装 Skill、启动 daemon 后再出报告', async () => {
+	const home = tempDir('pcbp-home-');
+	const homeDir = join(home, '.pcb-pilot');
+	const env = { PCBP_HOME: homeDir, PCBP_WS_PORT: '0', PCBP_RPC_PORT: '0' } as NodeJS.ProcessEnv;
+	const logs: string[] = [];
+	try {
+		const code = await runDoctor({ homeDir, userHome: home, platform: 'linux', env, fix: true, log: s => logs.push(s) });
+		expect(existsSync(join(homeDir, 'token'))).toBe(true);
+		for (const target of defaultTargets(home))
+			expect(existsSync(join(target.dir, 'SKILL.md'))).toBe(true);
+		const status = await new DaemonClient({ homeDir, env }).status();
+		expect(status.daemonVersion).toBeTruthy();
+		expect(logs.join('\n')).toContain('✓ daemon 运行中');
+		// 扩展没连仍是硬失败，--fix 不伪造成功
+		expect(code).toBe(1);
+	}
+	finally {
+		await new DaemonClient({ homeDir, env }).shutdown();
+	}
+}, 30000);
+
+it('runDoctor --fix 幂等：已有 token 不被改写', async () => {
+	const home = tempDir('pcbp-home-');
+	const homeDir = join(home, '.pcb-pilot');
+	mkdirSync(homeDir, { recursive: true });
+	const token = 'c'.repeat(64);
+	writeFileSync(join(homeDir, 'token'), `${token}\n`);
+	const env = { PCBP_HOME: homeDir, PCBP_WS_PORT: '0', PCBP_RPC_PORT: '0' } as NodeJS.ProcessEnv;
+	try {
+		await runDoctor({ homeDir, userHome: home, platform: 'linux', env, fix: true, log: () => {} });
+		expect(readFileSync(join(homeDir, 'token'), 'utf8').trim()).toBe(token);
+	}
+	finally {
+		await new DaemonClient({ homeDir, env }).shutdown();
+	}
+}, 30000);
 
 it('runStatus 无 daemon 时 exit 1', async () => {
 	const home = tempDir('pcbp-home-');

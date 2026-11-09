@@ -63,7 +63,7 @@ export class ExtensionBridge {
 
 	async stop(): Promise<void> {
 		clearInterval(this.sweepTimer);
-		this.dropExtension('NOT_CONNECTED', 'daemon stopping');
+		this.dropExtension('NOT_CONNECTED', 'daemon 正在停止，未完成的动作已取消；pcb-pilot start 后重试');
 		this.extension?.terminate();
 		this.extension = undefined;
 		await new Promise<void>(r => this.wss ? this.wss.close(() => r()) : r());
@@ -96,11 +96,11 @@ export class ExtensionBridge {
 		if (!parsed.success)
 			return Promise.resolve(fail('INVALID_PARAMS', parsed.error.message));
 		if (!this.getStatus().extensionConnected)
-			return Promise.resolve(fail('NOT_CONNECTED', 'no EDA extension connected'));
+			return Promise.resolve(fail('NOT_CONNECTED', 'EDA 扩展未连接：在 EDA 中打开原理图/PCB 文档，菜单 PCB Pilot → 重连（daemon 已在运行）'));
 
 		const job = async (): Promise<ActionResponse> => {
 			if (!this.getStatus().extensionConnected)
-				return fail('NOT_CONNECTED', 'no EDA extension connected');
+				return fail('NOT_CONNECTED', 'EDA 扩展未连接：在 EDA 中打开原理图/PCB 文档，菜单 PCB Pilot → 重连（daemon 已在运行）');
 			if (def.write && this.blocked)
 				return fail('READBACK_MISMATCH', `writes blocked after READBACK_MISMATCH (${this.blocked}); open a project to resync`);
 			const timeoutMs = this.opts.timeouts?.[action] ?? def.timeoutMs;
@@ -193,7 +193,7 @@ export class ExtensionBridge {
 			if (this.extension === ws) {
 				this.extension = undefined;
 				this.extensionVersion = undefined;
-				this.dropExtension('NOT_CONNECTED', 'extension disconnected');
+				this.dropExtension('NOT_CONNECTED', 'EDA 扩展断线，未完成的动作已取消；确认 EDA 未被关闭后重新连接再重试');
 			}
 		});
 		ws.on('error', () => {});

@@ -3,7 +3,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DaemonClient } from '../daemon/client.js';
-import { getPaths } from '../daemon/paths.js';
+import { getPaths, type DaemonPaths } from '../daemon/paths.js';
+import { loadOrCreateToken } from '../daemon/token.js';
 import { findEdaClient, platformNotes } from '../platform.js';
 import { defaultTargets, installSkill, registrationSnippets } from './install.js';
 
@@ -12,6 +13,7 @@ export interface CommandOptions {
 	userHome?: string;
 	env?: NodeJS.ProcessEnv;
 	platform?: NodeJS.Platform;
+	fix?: boolean;
 	log?: (line: string) => void;
 }
 
@@ -48,6 +50,52 @@ export async function runStatus(opts: CommandOptions = {}): Promise<number> {
 	}
 }
 
+// 只修「不依赖 EDA 端」的项：token、Skill、daemon。扩展是否连上只能由用户去 EDA 里操作
+async function applyFixes(opts: { paths: DaemonPaths; userHome: string; env: NodeJS.ProcessEnv; log: (line: string) => void }): Promise<void> {
+	const fixed: Array<string> = [];
+	const failed: Array<string> = [];
+	try {
+		loadOrCreateToken(opts.paths);
+		fixed.push(`token 就绪（${opts.paths.tokenFile}）`);
+	}
+	catch (err) {
+		failed.push(`生成 token 失败：${String(err)}`);
+	}
+	const installed = defaultTargets(opts.userHome).filter(t => existsSync(join(t.dir, 'SKILL.md')));
+	if (installed.length === 0) {
+		try {
+			const res = installSkill({ homeDir: opts.userHome, skillSrc: skillSource() });
+			fixed.push(`Skill 已安装到 ${res.installed.length} 个客户端目录`);
+		}
+		catch (err) {
+			failed.push(`安装 Skill 失败：${String(err)}`);
+		}
+	}
+	else {
+		fixed.push(`Skill 已就绪（${installed.length} 处）`);
+	}
+	const client = new DaemonClient({ homeDir: opts.paths.homeDir, env: opts.env });
+	try {
+		await client.status();
+		fixed.push('daemon 已在运行');
+	}
+	catch {
+		try {
+			const st = await client.ensureDaemon();
+			fixed.push(`daemon 已启动 (pid ${st.pid})`);
+		}
+		catch (err) {
+			failed.push(`启动 daemon 失败：${err instanceof Error ? err.message : String(err)}`);
+		}
+	}
+	opts.log('自动修复：');
+	for (const line of fixed)
+		opts.log(`  + ${line}`);
+	for (const line of failed)
+		opts.log(`  - ${line}`);
+	opts.log('');
+}
+
 export async function runDoctor(opts: CommandOptions = {}): Promise<number> {
 	const log = opts.log ?? console.log;
 	const env = opts.env ?? process.env;
@@ -55,6 +103,9 @@ export async function runDoctor(opts: CommandOptions = {}): Promise<number> {
 	const userHome = opts.userHome ?? homedir();
 	const paths = getPaths(opts.homeDir);
 	const results: Array<Check> = [];
+
+	if (opts.fix)
+		await applyFixes({ paths, userHome, env, log });
 
 	const nodeParts = process.versions.node.split('.').map(Number);
 	const nodeOk = nodeParts[0] > 20 || (nodeParts[0] === 20 && nodeParts[1] >= 17);
@@ -84,7 +135,7 @@ export async function runDoctor(opts: CommandOptions = {}): Promise<number> {
 
 	let daemonStatus: Awaited<ReturnType<DaemonClient['status']>> | undefined;
 	try {
-		daemonStatus = await new DaemonClient({ homeDir: opts.homeDir }).status();
+		daemonStatus = await new DaemonClient({ homeDir: opts.homeDir, env }).status();
 		results.push({ level: 'ok', label: 'daemon 运行中' });
 	}
 	catch {

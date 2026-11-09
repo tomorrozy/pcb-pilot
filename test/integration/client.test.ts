@@ -209,6 +209,52 @@ it('pid 仍在但 RPC 不通：保留 pidfile（可能正在启动）', async ()
 	catch {}
 });
 
+it('daemon 不在时动作会自动拉起 daemon 再执行', async () => {
+	const homeDir = mkdtempSync(join(tmpdir(), 'pcbp-autostart-'));
+	const [wsPort, rpcPort] = await freePorts(2);
+	const client = new DaemonClient({ homeDir, env: { PCBP_HOME: homeDir, PCBP_WS_PORT: String(wsPort), PCBP_RPC_PORT: String(rpcPort) } });
+	try {
+		const res = await client.action('sch.listNets');
+		expect(res.ok).toBe(false);
+		expect(res.error?.code).toBe('NOT_CONNECTED');
+		// 报错必须是「扩展没连」，而不是「daemon 没启动」——后者刚被自愈掉了
+		expect(res.error?.message).toMatch(/扩展|extension/i);
+		const st = await client.status();
+		expect(st.wsPort).toBe(wsPort);
+	}
+	finally {
+		await client.shutdown();
+	}
+}, 30000);
+
+it('陈旧 pidfile + 动作 → 自动重建 daemon', async () => {
+	const homeDir = mkdtempSync(join(tmpdir(), 'pcbp-autostart-stale-'));
+	const [wsPort, rpcPort] = await freePorts(2);
+	const deadPid = findDeadPid();
+	writePidFile(homeDir, deadPid, [rpcPort, wsPort]);
+	const client = new DaemonClient({ homeDir, env: { PCBP_HOME: homeDir, PCBP_WS_PORT: String(wsPort), PCBP_RPC_PORT: String(rpcPort) } });
+	try {
+		const res = await client.action('sch.listNets');
+		expect(res.error?.code).toBe('NOT_CONNECTED');
+		const pidNow = (JSON.parse(readFileSync(join(homeDir, 'daemon.json'), 'utf8')) as { pid: number }).pid;
+		expect(pidNow).not.toBe(deadPid);
+		expect(pidNow).toBe((await client.status()).pid);
+	}
+	finally {
+		await client.shutdown();
+	}
+}, 30000);
+
+it('daemon 进程活着但 RPC 不通：写动作不重放，报「无响应」且不新建 daemon', async () => {
+	const homeDir = mkdtempSync(join(tmpdir(), 'pcbp-hung-'));
+	const file = writePidFile(homeDir, process.pid, await freePorts(2));
+	const client = new DaemonClient({ homeDir });
+	const res = await client.action('sch.wire', { points: [[0, 0], [1, 1]] });
+	expect(res.ok).toBe(false);
+	expect(res.error?.message).toMatch(/没有响应/);
+	expect((JSON.parse(readFileSync(file, 'utf8')) as { pid: number }).pid).toBe(process.pid);
+});
+
 it('长动作（>5s）客户端不中途超时', async () => {
 	const homeDir = mkdtempSync(join(tmpdir(), 'pcbp-long-'));
 	const daemon = await startDaemon({ homeDir, env: { PCBP_WS_PORT: '0', PCBP_RPC_PORT: '0' } as NodeJS.ProcessEnv });

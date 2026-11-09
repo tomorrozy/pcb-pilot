@@ -4,12 +4,20 @@ import { fileURLToPath } from 'node:url';
 import type { BridgeStatus } from './bridge.js';
 import type { DaemonPaths } from './paths.js';
 import { getPaths } from './paths.js';
-import type { ActionResponse } from '../protocol/types.js';
+import type { ActionResponse, ErrorCode } from '../protocol/types.js';
 import { getActionDef } from '../protocol/actions.js';
 
 export type DaemonStatus = BridgeStatus & { daemonVersion: string; pid: number; rpcPort: number; wsPort: number };
 
 export type ShutdownResult = 'stopped' | 'stale-cleaned' | 'still-running';
+
+function isTimeout(err: unknown): boolean {
+	return err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
+}
+
+function describeErr(err: unknown): string {
+	return err instanceof Error ? err.message : String(err);
+}
 
 interface DaemonFile {
 	pid: number;
@@ -75,14 +83,51 @@ export class DaemonClient {
 	async action(name: string, params: Record<string, unknown> = {}): Promise<ActionResponse> {
 		const timeoutMs = (getActionDef(name)?.timeoutMs ?? 30000) + 5000;
 		try {
-			const res = await this.rpc('action', { action: name, params }, timeoutMs);
-			return res as unknown as ActionResponse;
+			return (await this.rpc('action', { action: name, params }, timeoutMs)) as unknown as ActionResponse;
 		}
 		catch (err) {
-			this.pruneIfStale();
-			const code = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError') ? 'TIMEOUT' : 'NOT_CONNECTED';
-			return { type: 'result', id: 'unknown', ok: false, error: { code, message: `daemon request failed: ${String(err)}` } };
+			return this.recoverAction(name, params, timeoutMs, err);
 		}
+	}
+
+	// 只在「确认 daemon 不在运行」时重放：此时请求不可能到达过 EDA，写动作重放也不会重复执行。
+	// 进程还活着但 RPC 不通属于结果未知，绝不重放，只如实报告。
+	private async recoverAction(name: string, params: Record<string, unknown>, timeoutMs: number, err: unknown): Promise<ActionResponse> {
+		const pid = this.readDaemonFile()?.pid;
+		const wasRunning = typeof pid === 'number' && isPidAlive(pid);
+		if (this.isTransportFailure(err) && !wasRunning) {
+			try {
+				await this.ensureDaemon();
+				return (await this.rpc('action', { action: name, params }, timeoutMs)) as unknown as ActionResponse;
+			}
+			catch (retryErr) {
+				this.pruneIfStale();
+				return this.failure(isTimeout(retryErr) ? 'TIMEOUT' : 'NOT_CONNECTED',
+					`daemon 未能自动启动或启动后仍不可达：${describeErr(retryErr)}。启动日志：${this.paths.daemonLogFile}`);
+			}
+		}
+		this.pruneIfStale();
+		if (isTimeout(err))
+			return this.failure('TIMEOUT', `${name} 在 ${timeoutMs} ms 内没有响应；动作可能仍在 EDA 侧执行，先用 pcb-pilot status 确认，再决定是否重试`);
+		if (wasRunning)
+			return this.failure('NOT_CONNECTED', `daemon 进程还在（pid ${pid}），但 127.0.0.1 上的 RPC 没有响应；查看 ${this.paths.daemonLogFile}，必要时 pcb-pilot stop 后重新 start`);
+		if (this.isTransportFailure(err))
+			return this.failure('NOT_CONNECTED', `daemon 不可达且自动启动失败；查看 ${this.paths.daemonLogFile} 或手动运行 pcb-pilot start`);
+		return this.failure('EDA_API_ERROR', `daemon 内部错误：${describeErr(err)}`);
+	}
+
+	private failure(code: ErrorCode, message: string): ActionResponse {
+		return { type: 'result', id: 'unknown', ok: false, error: { code, message } };
+	}
+
+	private isTransportFailure(err: unknown): boolean {
+		const e = err as { name?: string; message?: string; code?: string; cause?: { code?: string } };
+		if (e?.code === 'DAEMON_DOWN')
+			return true;
+		if (e?.name === 'TypeError' && /fetch failed/i.test(e.message ?? ''))
+			return true;
+		const code = e?.cause?.code;
+		return code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'UND_ERR_SOCKET' || code === 'EHOSTUNREACH' || code === 'ENETUNREACH';
 	}
 
 	async ensureDaemon(): Promise<DaemonStatus> {
@@ -200,7 +245,7 @@ export class DaemonClient {
 	private async rpc(method: string, params?: unknown, timeoutMs = 5000): Promise<Record<string, unknown>> {
 		const file = this.readDaemonFile();
 		if (!file)
-			throw new Error('pcb-pilot daemon is not running');
+			throw Object.assign(new Error('pcb-pilot daemon is not running (no pidfile)'), { code: 'DAEMON_DOWN' });
 		const res = await fetch(`http://127.0.0.1:${file.rpcPort}/rpc`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
