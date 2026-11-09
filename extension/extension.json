@@ -1,0 +1,116 @@
+{
+	"name": "pcb-pilot-bridge",
+	"uuid": "b3077951fb9b4b8a9c1bcf279b7d7024",
+	"displayName": "PCB Pilot Bridge",
+	"description": "MCP bridge for AI agents to drive JLCEDA / EasyEDA Pro — 让 AI agent 操控嘉立创EDA画板",
+	"version": "0.1.0",
+	"publisher": "tomorrozy",
+	"engines": {
+		"eda": "^3.2.0"
+	},
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "extension-store",
+		"url": ""
+	},
+	"categories": "Other",
+	"keywords": [
+		"Tool",
+		"MCP",
+		"AI"
+	],
+	"images": {
+		"logo": "./images/logo.png"
+	},
+	"homepage": "https://github.com/tomorrozy/pcb-pilot",
+	"bugs": "https://github.com/tomorrozy/pcb-pilot/issues",
+	"activationEvents": {},
+	"entry": "./dist/index",
+	"dependentExtensions": {},
+	"headerMenus": {
+		"home": [
+			{
+				"id": "pcb-pilot",
+				"title": "PCB Pilot",
+				"menuItems": [
+					{
+						"id": "status",
+						"title": "连接状态 / Status",
+						"registerFn": "status"
+					},
+					{
+						"id": "reconnect",
+						"title": "重连 / Reconnect",
+						"registerFn": "reconnect"
+					},
+					{
+						"id": "setToken",
+						"title": "设置 Token / Set Token",
+						"registerFn": "setToken"
+					},
+					{
+						"id": "about",
+						"title": "关于 / About",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
+		"sch": [
+			{
+				"id": "pcb-pilot",
+				"title": "PCB Pilot",
+				"menuItems": [
+					{
+						"id": "status",
+						"title": "连接状态 / Status",
+						"registerFn": "status"
+					},
+					{
+						"id": "reconnect",
+						"title": "重连 / Reconnect",
+						"registerFn": "reconnect"
+					},
+					{
+						"id": "setToken",
+						"title": "设置 Token / Set Token",
+						"registerFn": "setToken"
+					},
+					{
+						"id": "about",
+						"title": "关于 / About",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
+		"pcb": [
+			{
+				"id": "pcb-pilot",
+				"title": "PCB Pilot",
+				"menuItems": [
+					{
+						"id": "status",
+						"title": "连接状态 / Status",
+						"registerFn": "status"
+					},
+					{
+						"id": "reconnect",
+						"title": "重连 / Reconnect",
+						"registerFn": "reconnect"
+					},
+					{
+						"id": "setToken",
+						"title": "设置 Token / Set Token",
+						"registerFn": "setToken"
+					},
+					{
+						"id": "about",
+						"title": "关于 / About",
+						"registerFn": "about"
+					}
+				]
+			}
+		]
+	}
+}

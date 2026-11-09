@@ -1,0 +1,12 @@
+/.git/
+/build/
+/config/
+/node_modules/
+/src/
+/test/
+/package.json
+/package-lock.json
+/tsconfig.json
+/.edaignore
+/README.md
+*.log

@@ -1,0 +1,26 @@
+{
+	"name": "pcb-pilot-bridge",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "PCB Pilot bridge extension for JLCEDA / EasyEDA Pro",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"compile": "rimraf ./dist/ && node ./config/esbuild.prod.ts",
+		"build": "npm run compile && node ./build/packaged.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@jlceda/pro-api-types": "^0.4.27",
+		"@types/fs-extra": "^11.0.4",
+		"esbuild": "^0.24.2",
+		"fs-extra": "^11.3.0",
+		"ignore": "^7.0.3",
+		"jszip": "^3.10.1",
+		"rimraf": "^6.0.1",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	}
+}
