@@ -14,7 +14,7 @@ description: 通过 MCP 操控嘉立创EDA专业版（EasyEDA Pro）画原理图
 3. **分步执行**：批量放件/连线时分多次调用，每步之间做读回，不要一口气提交几十个动作。
 4. **器件必须从库确认**：不要臆造器件 UUID。先 `library_searchDevice` 或 `library_getByLcscId`（立创编号 C 开头），用返回的 `libraryUuid` + `uuid` 放件。
 5. **离线模式**：客户端可能处于离线/本地工程模式，器件搜索能力受限；搜不到时告知用户，不要反复重试。
-6. **失败如实报告**：`NOT_CONNECTED` 表示用户在 EDA 里没装/没连扩展或没开「允许外部交互」，请用户按 `pcb-pilot doctor` 的提示处理。
+6. **失败如实报告**：`NOT_CONNECTED` 有两种原因——daemon 没在跑（工具会在动作时自动拉起一次并重试）或用户在 EDA 里没装/没连扩展、没开「允许外部交互」。仍失败时让用户跑 `pcb-pilot doctor --fix`，再按输出的 EDA 端清单处理。
 7. 不编造 DRC 结果、不跳过 DRC 直接声称「可以打样」。
 
 ## 工作流
@@ -68,7 +68,7 @@ description: 通过 MCP 操控嘉立创EDA专业版（EasyEDA Pro）画原理图
 
 | 错误码 | 含义 | 应对 |
 |---|---|---|
-| `NOT_CONNECTED` | 扩展未连接 / daemon 未运行 | 让用户跑 `pcb-pilot doctor` |
+| `NOT_CONNECTED` | daemon 没在跑（已自动尝试拉起）或扩展未连接 | 让用户跑 `pcb-pilot doctor --fix`，再按 EDA 端清单处理 |
 | `TIMEOUT` | 动作超时（自动布线可能较久） | 减小单次动作规模后重试 |
 | `INVALID_PARAMS` | 参数不符合协议 | 按工具 schema 修正 |
 | `EDA_API_ERROR` | EDA 官方 API 报错 | 原文转述给用户 |

@@ -25,6 +25,7 @@ pcb-pilot install         # installs the Skill, prints MCP registration
 claude mcp add pcb-pilot -- npx -y pcb-pilot mcp   # or: codex mcp add ...
 pcb-pilot start
 pcb-pilot status          # shows the daemon status + token location
+pcb-pilot doctor --fix    # self-heal: token, Skill and daemon in one command
 ```
 
 In JLCEDA Pro: install `pcb-pilot-bridge_v*.eext` from the GitHub release, enable **Allow external interaction**, open a schematic/PCB document, then **PCB Pilot → Set Token** (paste the token) and **Reconnect**. Run `pcb-pilot doctor` until the daemon / extension / token checks are green (an `!` on the client-path probe is informational — see [Platforms](#platforms)).
@@ -54,6 +55,8 @@ Multiple clients can share one daemon; restarting an agent does not drop the EDA
 | Linux 4.9+ (x64/arm64) | ⬜ same | ✅ `ubuntu-latest` passing (73 passed / 1 Windows-only skipped) | ⬜ unverified |
 
 All platforms share one data dir, `~/.pcb-pilot/` (on POSIX `token` and `audit.jsonl` are tightened to `0600`, and a dir we create is `0700`), and loopback ports `127.0.0.1:49630/49631`. The client is located by checking `PCBP_EDA_DIR` → the platform's default install dirs → a `lceda-pro` entry on `PATH`; a miss is reported as `!` and never fails `doctor`, because the authoritative signal is the extension being connected. macOS Gatekeeper, Linux zip layout and the online/half-offline re-import caveat are covered in [`docs/platforms.md`](docs/platforms.md).
+
+Self-healing: if the daemon is not running at all, an action auto-starts it and retries once (replay only happens when the daemon was verifiably not running; a live but unresponsive daemon never gets writes replayed). `pcb-pilot doctor --fix` creates the token, installs the Skill and starts the daemon; connecting the EDA extension is still a manual step in the EDA UI.
 
 ## Security
 

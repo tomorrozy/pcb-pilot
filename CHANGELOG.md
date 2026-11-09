@@ -2,6 +2,18 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；版本号遵循 SemVer。
 
+## [未发布]
+
+### 新增
+
+- 自愈：动作执行前发现 daemon 根本没在跑时，客户端会自动拉起 daemon 并重试一次；`pcb-pilot doctor --fix` 一次性补齐 token、Skill 与 daemon。
+- 中文品牌：README 标题、扩展显示名（`PCB Pilot 电路板助手`）、仓库描述改为中文（仓库标识仍为 `pcb-pilot`，GitHub 不允许中文 slug）。
+
+### 变更
+
+- `NOT_CONNECTED` 不再把「daemon 没启动」「进程活着但 RPC 无响应」「EDA 扩展没连」混成一句话：分别给出下一步命令（`pcb-pilot doctor --fix` / 看 `daemon.log` / 在 EDA 里重连）。
+- 重试边界写死：只有确认 daemon 未运行（请求不可能到达过 EDA）才重放；pid 活着但 RPC 不通属于结果未知，读写动作都不重放。
+
 ## [0.2.0] - 2026-11-09
 
 跨平台升级版：Windows / macOS / Linux 共用一套 daemon、CLI 与 MCP 适配器。

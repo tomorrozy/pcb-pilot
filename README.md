@@ -42,6 +42,9 @@ codex mcp add pcb-pilot -- npx -y pcb-pilot mcp
 pcb-pilot start
 pcb-pilot status
 
+# 4.5 环境不对时一条命令自愈：补齐 token、安装 Skill、拉起 daemon
+pcb-pilot doctor --fix
+
 # 5. 在嘉立创EDA专业版里：
 #    a. 扩展管理器安装 GitHub Release 里的 pcb-pilot-bridge_v*.eext 并启用
 #    b. 打开「允许外部交互」
@@ -84,6 +87,8 @@ v1 面向离线/本地工程：`project.create` 不依赖云端 team，工程落
 | Linux（4.9+，x64/arm64） | ⬜ 同上 | ✅ `ubuntu-latest` 通过（73 passed / 1 个 Windows-only 跳过） | ⬜ 未验证 |
 
 三平台共用一个数据目录 `~/.pcb-pilot/`（POSIX 上 `token` 与 `audit.jsonl` 收紧为 `0600`，本工具新建的目录为 `0700`），daemon 端口 `127.0.0.1:49630/49631`。EDA 客户端位置按 `PCBP_EDA_DIR` → 各平台默认目录 → PATH 里的 `lceda-pro` 顺序探测；探不到只算提示（`!`），不会让 `doctor` 判失败——扩展连上 daemon 才是可用信号。细节（Gatekeeper 放行、Linux zip 解压即用、切换在线/离线模式后需重新导入 .eext）见 [`docs/platforms.md`](docs/platforms.md)。
+
+自愈：agent 调动作时如果 daemon 根本没在跑，客户端会先自动拉起再重试一次（仅在确认 daemon 未运行时重放；进程活着但不响应时写动作绝不重放）；`pcb-pilot doctor --fix` 一次性补齐 token、Skill 与 daemon，扩展连接仍需你到 EDA 里操作。
 
 ## 安全模型
 
