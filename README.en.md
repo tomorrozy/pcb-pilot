@@ -4,7 +4,7 @@ Give AI agents real hands to design PCBs in **JLCEDA Pro / EasyEDA Pro**.
 
 Claude Code, Codex, DeepSeek Harness, Qoder and any MCP-capable agent can create projects, search the LCSC library, place parts, wire schematics, lay out and route PCBs, run DRC, and export Gerber/BOM — through typed actions, not arbitrary JavaScript.
 
-> Requires the **desktop Pro client** (the standard/web edition has no extension API). v1 targets **offline/local projects**, Windows first.
+> Requires the **desktop Pro client** (the standard/web edition has no extension API). Targets **offline/local projects**. Daemon / CLI / MCP run on **Windows, macOS and Linux** (CI covers all three); the real-machine EDA loop has only been exercised on Windows so far — verify macOS/Linux yourself with `docs/platforms.md`.
 
 ## Architecture
 
@@ -27,7 +27,7 @@ pcb-pilot start
 pcb-pilot status          # shows the daemon status + token location
 ```
 
-In JLCEDA Pro: install `pcb-pilot-bridge_v*.eext` from the GitHub release, enable **Allow external interaction**, open a schematic/PCB document, then **PCB Pilot → Set Token** (paste the token) and **Reconnect**. Run `pcb-pilot doctor` until every check is green.
+In JLCEDA Pro: install `pcb-pilot-bridge_v*.eext` from the GitHub release, enable **Allow external interaction**, open a schematic/PCB document, then **PCB Pilot → Set Token** (paste the token) and **Reconnect**. Run `pcb-pilot doctor` until the daemon / extension / token checks are green (an `!` on the client-path probe is informational — see [Platforms](#platforms)).
 
 Then just ask:
 
@@ -44,6 +44,16 @@ Then just ask:
 | Qoder | Skill installed at `~/.agents/skills/pcb-pilot`; use the JSON config |
 
 Multiple clients can share one daemon; restarting an agent does not drop the EDA bridge.
+
+## Platforms
+
+| Platform | Code + CI | Real EDA machine |
+|---|---|---|
+| Windows | ✅ | ⏳ smoke checklist pending |
+| macOS 11+ | ✅ | ⬜ unverified |
+| Linux 4.9+ (x64/arm64) | ✅ | ⬜ unverified |
+
+All platforms share one data dir, `~/.pcb-pilot/` (token `0600`, dir `0700`), and loopback ports `127.0.0.1:49630/49631`. The client is located by checking `PCBP_EDA_DIR` → the platform's default install dirs → a `lceda-pro` entry on `PATH`; a miss is reported as `!` and never fails `doctor`, because the authoritative signal is the extension being connected. macOS Gatekeeper, Linux zip layout and the online/half-offline re-import caveat are covered in [`docs/platforms.md`](docs/platforms.md).
 
 ## Security
 

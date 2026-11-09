@@ -1,9 +1,10 @@
 # 真机冒烟清单
 
-> 在 Windows + 嘉立创EDA专业版（≥ 3.2）上执行。每一步都要看到 Expected 结果再继续；失败时记录报错原文与 `~/.pcb-pilot/audit.jsonl` 最后几行。
+> 在 Windows / macOS / Linux 任意的嘉立创EDA专业版（≥ 3.2）上执行。每一步都要看到 Expected 结果再继续；失败时记录报错原文与 `~/.pcb-pilot/audit.jsonl` 最后几行。平台特有的准备（Gatekeeper、Linux 解压目录、`PCBP_EDA_DIR`）见 `docs/platforms.md`。
 
 ## 0. 准备
 
+- [ ] 按 `docs/platforms.md` 完成本平台的客户端安装准备（macOS 需放行 Gatekeeper；Linux 需记下解压目录）
 - [ ] `npm i -g pcb-pilot`（或使用仓库内构建产物）
 - [ ] `pcb-pilot install` 输出三个 Skill 安装路径与 MCP 注册命令
 - [ ] agent 客户端已注册 MCP（重启客户端）
@@ -13,6 +14,8 @@
 - [ ] `pcb-pilot start` → 输出 `daemon 运行中 (pid …)`
 - [ ] `pcb-pilot status` → 全部 ✓（此时扩展未连，最后一项 ✗ 是预期）
 - [ ] `pcb-pilot stop` → 再 `start`，`~/.pcb-pilot/daemon.json` 重建
+- [ ] 强杀 daemon（POSIX `kill -9 <pid>` / Windows 任务管理器「结束进程」）→ `pcb-pilot status` 报未运行，且陈旧的 `~/.pcb-pilot/daemon.json` 被自动清理，再 `start` 可恢复
+- [ ] `pcb-pilot doctor`：`PCBP_EDA_DIR` 指向真实客户端目录时 EDA 客户端项为 ✓；不设该变量时该项是 `!`（提示）而不是 ✗，且不影响退出码
 
 ## 2. 安装扩展
 
@@ -22,7 +25,7 @@
 - [ ] 打开一个原理图文档
 - [ ] 菜单 PCB Pilot → 设置 Token：粘贴 `~/.pcb-pilot/token` 内容
 - [ ] 菜单 PCB Pilot → 重连
-- [ ] `pcb-pilot doctor` → 全部 ✓
+- [ ] `pcb-pilot doctor` → daemon/扩展/token/Skill 全 ✓（EDA 客户端项为 ✓ 或提示 `!` 都算通过）
 
 ## 3. Agent 链路
 
@@ -53,5 +56,5 @@
 
 ## 7. 结束
 
-- [ ] `pcb-pilot doctor` 全绿
+- [ ] `pcb-pilot doctor`：daemon/扩展/token/Skill 四项 ✓（EDA 客户端项允许为 `!`）
 - [ ] 把失败项与日志贴到 GitHub Issue

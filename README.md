@@ -4,7 +4,7 @@
 
 给 Claude Code / Codex / DeepSeek Harness / Qoder 等 agent 装上一双「画板的手」：通过 MCP 调用 typed action，真实地建工程、搜立创商城器件、放件、连线、布局布线、跑 DRC、导出 Gerber/BOM。
 
-> 仅支持**专业版桌面客户端**（标准版/网页版没有扩展 API）。v1 面向**离线/本地工程模式**，Windows 优先。
+> 仅支持**专业版桌面客户端**（标准版/网页版没有扩展 API）。面向**离线/本地工程模式**。daemon / CLI / MCP 支持 **Windows、macOS、Linux**（CI 三平台跑通）；EDA 真机联调目前只在 Windows 上做，macOS/Linux 请按 `docs/platforms.md` 自行验证。
 
 ## 架构
 
@@ -25,6 +25,8 @@
 ## 5 分钟上手
 
 ```bash
+# 0. 平台特有的客户端准备（macOS Gatekeeper、Linux 无固定安装目录）见 docs/platforms.md
+
 # 1. 安装 CLI（Node >= 20.17）
 npm i -g pcb-pilot
 
@@ -73,6 +75,16 @@ Agent 会按 Skill 的工作流读现状、搜库选型、放件、连线、读�
 
 v1 面向离线/本地工程：`project.create` 不依赖云端 team，工程落在本地。器件库搜索能力受客户端离线模式限制——搜索不到时 Skill 会提示用户，而不是臆造器件。
 
+## 平台说明
+
+| 平台 | 代码 + CI | EDA 真机 |
+|---|---|---|
+| Windows | ✅ | ⏳ 待跑冒烟清单 |
+| macOS（11+） | ✅ | ⬜ 未验证 |
+| Linux（4.9+，x64/arm64） | ✅ | ⬜ 未验证 |
+
+三平台共用一个数据目录 `~/.pcb-pilot/`（token `0600`、目录 `0700`），daemon 端口 `127.0.0.1:49630/49631`。EDA 客户端位置按 `PCBP_EDA_DIR` → 各平台默认目录 → PATH 里的 `lceda-pro` 顺序探测；探不到只算提示（`!`），不会让 `doctor` 判失败——扩展连上 daemon 才是可用信号。细节（Gatekeeper 放行、Linux zip 解压即用、切换在线/离线模式后需重新导入 .eext）见 [`docs/platforms.md`](docs/platforms.md)。
+
 ## 安全模型
 
 - 所有监听只绑 `127.0.0.1`，不外网。
@@ -102,7 +114,7 @@ npm run build --prefix extension   # 产出 extension/build/dist/*.eext（需 No
 
 ## 路线图
 
-- [ ] macOS / Linux 支持
+- [x] macOS / Linux 支持（代码、探测、权限、CI 已完成；EDA 真机验证待用户/社区按 `docs/platforms.md` 反馈）
 - [ ] 多 EDA 实例
 - [ ] 铺铜编辑、差分对/等长规则动作
 - [ ] 官方扩展商店上架
