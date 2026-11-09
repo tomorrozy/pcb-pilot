@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { BridgeStatus } from './bridge.js';
 import type { DaemonPaths } from './paths.js';
@@ -29,6 +29,18 @@ function resolveDaemonMain(): string {
 	return found;
 }
 
+export function isPidAlive(pid: number): boolean {
+	if (!Number.isInteger(pid) || pid <= 0)
+		return false;
+	try {
+		process.kill(pid, 0);
+		return true;
+	}
+	catch (err) {
+		return (err as NodeJS.ErrnoException).code !== 'ESRCH';
+	}
+}
+
 export class DaemonClient {
 	private readonly paths: DaemonPaths;
 	private readonly env: NodeJS.ProcessEnv;
@@ -42,7 +54,15 @@ export class DaemonClient {
 		const file = this.readDaemonFile();
 		if (!file)
 			throw new Error('pcb-pilot daemon is not running');
-		const res = await this.rpc('status', undefined, 500);
+		let res: Record<string, unknown>;
+		try {
+			res = await this.rpc('status', undefined, 500);
+		}
+		catch (err) {
+			if (this.pruneIfStale())
+				throw new Error('pcb-pilot daemon is not running (stale pidfile removed)');
+			throw err;
+		}
 		return { ...(res as unknown as BridgeStatus), daemonVersion: res.daemonVersion as string, pid: res.pid as number, rpcPort: file.rpcPort, wsPort: file.wsPort };
 	}
 
@@ -53,6 +73,7 @@ export class DaemonClient {
 			return res as unknown as ActionResponse;
 		}
 		catch (err) {
+			this.pruneIfStale();
 			const code = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError') ? 'TIMEOUT' : 'NOT_CONNECTED';
 			return { type: 'result', id: 'unknown', ok: false, error: { code, message: `daemon request failed: ${String(err)}` } };
 		}
@@ -68,6 +89,7 @@ export class DaemonClient {
 			stdio: 'ignore',
 			env: { ...this.env, PCBP_HOME: this.paths.homeDir },
 		});
+		child.once('error', () => {});
 		child.unref();
 		const start = Date.now();
 		let lastErr: unknown;
@@ -92,8 +114,24 @@ export class DaemonClient {
 		while (Date.now() - start < 3000) {
 			if (!existsSync(this.paths.daemonFile))
 				return;
+			if (this.pruneIfStale())
+				return;
 			await new Promise(r => setTimeout(r, 100));
 		}
+		this.pruneIfStale();
+	}
+
+	private pruneIfStale(): boolean {
+		const file = this.readDaemonFile();
+		if (!file || isPidAlive(file.pid))
+			return false;
+		try {
+			unlinkSync(this.paths.daemonFile);
+		}
+		catch {
+			return false;
+		}
+		return true;
 	}
 
 	private readDaemonFile(): DaemonFile | undefined {
