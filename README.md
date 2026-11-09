@@ -1,4 +1,4 @@
-# pcb-pilot
+# pcb-pilot · 嘉立创EDA 电路板助手
 
 让 AI agent 直接操控**嘉立创EDA专业版（EasyEDA Pro）**画原理图和 PCB。
 

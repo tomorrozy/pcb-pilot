@@ -1,7 +1,7 @@
 {
 	"name": "pcb-pilot-bridge",
 	"uuid": "b3077951fb9b4b8a9c1bcf279b7d7024",
-	"displayName": "PCB Pilot Bridge",
+	"displayName": "PCB Pilot 电路板助手",
 	"description": "MCP bridge for AI agents to drive JLCEDA / EasyEDA Pro — 让 AI agent 操控嘉立创EDA画板",
 	"version": "0.2.0",
 	"publisher": "tomorrozy",

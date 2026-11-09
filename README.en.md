@@ -1,4 +1,4 @@
-# pcb-pilot
+# pcb-pilot · 嘉立创EDA Circuit Board Copilot
 
 Give AI agents real hands to design PCBs in **JLCEDA Pro / EasyEDA Pro**.
 
