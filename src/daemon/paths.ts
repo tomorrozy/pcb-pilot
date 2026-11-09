@@ -12,7 +12,7 @@ export interface DaemonPaths {
 }
 
 export function getPaths(homeDir?: string): DaemonPaths {
-	const dir = homeDir ?? join(homedir(), '.pcb-pilot');
+	const dir = homeDir ?? process.env.PCBP_HOME ?? join(homedir(), '.pcb-pilot');
 	return {
 		homeDir: dir,
 		tokenFile: join(dir, 'token'),

@@ -24,6 +24,17 @@ it('loadConfig 默认端口 49630/49631', () => {
 	expect(cfg.rpcPort).toBe(49631);
 });
 
+it('getPaths 支持 PCBP_HOME 环境变量覆盖', () => {
+	const dir = tempHome();
+	process.env.PCBP_HOME = dir;
+	try {
+		expect(getPaths().homeDir).toBe(dir);
+	}
+	finally {
+		delete process.env.PCBP_HOME;
+	}
+});
+
 it('loadConfig env 优先于 configFile', () => {
 	const paths = getPaths(tempHome());
 	writeFileSync(paths.configFile, JSON.stringify({ wsPort: 1111, rpcPort: 2222 }));
