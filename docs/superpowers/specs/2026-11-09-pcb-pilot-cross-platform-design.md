@@ -74,8 +74,10 @@ v0.1 的 README 路线图第 1 项是「macOS / Linux 支持」。本次升级�
 - CI 三平台构建后校验 `dist/cli/main.js` 首行无 `\r`。
 - `package.json` 加 `prepublishOnly`（v0.1 遗留 minor，顺手补上，防发布旧 dist）。
 
-### 6.5 token 权限
-- `loadOrCreateToken` 无论新建还是复用，POSIX 下 `chmodSync(0o600)`（`writeFileSync` 的 mode 只在建文件时生效，已有文件不会改）。Windows 上 try/catch 忽略。
+### 6.5 token 与审计文件权限
+- `loadOrCreateToken` 无论新建还是复用，POSIX 下把 `token` 收紧到 `0600`（`writeFileSync` 的 mode 只在建文件时生效，已有文件不会改）。Windows 上 try/catch 忽略。
+- **收紧的是文件而不是目录**（原计划的 `chmod 0700` 数据目录已放弃）：`PCBP_HOME` 允许指向用户自选的位置，daemon 去改一个不是自己创建的目录权限属于越权副作用；而 POSIX 下 0755 目录只暴露文件名，token 与 `audit.jsonl`（内含工程内容）各自 `0600` 就足以阻止同机其他用户读取内容。
+- 由本工具新建的数据目录仍是 `0700`；`AuditLogger` 构造时对审计文件走同一条收紧路径。
 
 ### 6.6 CI/Release
 - ci.yml：matrix 三 OS，`fail-fast: false`；typecheck/test/build 全跑；artifact 仅由 `ubuntu-latest` 上传（避免同名冲突）；新增 bin-EOL 校验步。

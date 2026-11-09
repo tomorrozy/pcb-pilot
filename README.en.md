@@ -53,7 +53,7 @@ Multiple clients can share one daemon; restarting an agent does not drop the EDA
 | macOS 11+ | ✅ | ⬜ unverified |
 | Linux 4.9+ (x64/arm64) | ✅ | ⬜ unverified |
 
-All platforms share one data dir, `~/.pcb-pilot/` (token `0600`, dir `0700`), and loopback ports `127.0.0.1:49630/49631`. The client is located by checking `PCBP_EDA_DIR` → the platform's default install dirs → a `lceda-pro` entry on `PATH`; a miss is reported as `!` and never fails `doctor`, because the authoritative signal is the extension being connected. macOS Gatekeeper, Linux zip layout and the online/half-offline re-import caveat are covered in [`docs/platforms.md`](docs/platforms.md).
+All platforms share one data dir, `~/.pcb-pilot/` (on POSIX `token` and `audit.jsonl` are tightened to `0600`, and a dir we create is `0700`), and loopback ports `127.0.0.1:49630/49631`. The client is located by checking `PCBP_EDA_DIR` → the platform's default install dirs → a `lceda-pro` entry on `PATH`; a miss is reported as `!` and never fails `doctor`, because the authoritative signal is the extension being connected. macOS Gatekeeper, Linux zip layout and the online/half-offline re-import caveat are covered in [`docs/platforms.md`](docs/platforms.md).
 
 ## Security
 

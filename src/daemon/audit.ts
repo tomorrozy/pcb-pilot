@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { restrictToOwner } from './permissions.js';
 
 export interface AuditEntry {
 	ts: string;
@@ -14,6 +15,7 @@ export interface AuditEntry {
 export class AuditLogger {
 	constructor(private readonly filePath: string) {
 		mkdirSync(dirname(filePath), { recursive: true });
+		restrictToOwner(filePath);
 	}
 
 	append(entry: AuditEntry): void {

@@ -83,7 +83,7 @@ v1 面向离线/本地工程：`project.create` 不依赖云端 team，工程落
 | macOS（11+） | ✅ | ⬜ 未验证 |
 | Linux（4.9+，x64/arm64） | ✅ | ⬜ 未验证 |
 
-三平台共用一个数据目录 `~/.pcb-pilot/`（token `0600`、目录 `0700`），daemon 端口 `127.0.0.1:49630/49631`。EDA 客户端位置按 `PCBP_EDA_DIR` → 各平台默认目录 → PATH 里的 `lceda-pro` 顺序探测；探不到只算提示（`!`），不会让 `doctor` 判失败——扩展连上 daemon 才是可用信号。细节（Gatekeeper 放行、Linux zip 解压即用、切换在线/离线模式后需重新导入 .eext）见 [`docs/platforms.md`](docs/platforms.md)。
+三平台共用一个数据目录 `~/.pcb-pilot/`（POSIX 上 `token` 与 `audit.jsonl` 收紧为 `0600`，本工具新建的目录为 `0700`），daemon 端口 `127.0.0.1:49630/49631`。EDA 客户端位置按 `PCBP_EDA_DIR` → 各平台默认目录 → PATH 里的 `lceda-pro` 顺序探测；探不到只算提示（`!`），不会让 `doctor` 判失败——扩展连上 daemon 才是可用信号。细节（Gatekeeper 放行、Linux zip 解压即用、切换在线/离线模式后需重新导入 .eext）见 [`docs/platforms.md`](docs/platforms.md)。
 
 ## 安全模型
 
