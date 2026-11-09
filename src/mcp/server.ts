@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { z } from 'zod';
@@ -5,7 +6,7 @@ import type { DaemonClient } from '../daemon/client.js';
 import { ACTIONS } from '../protocol/actions.js';
 import { ACTION_NAMES } from '../protocol/names.js';
 
-const pkgVersion = '0.1.0';
+const pkgVersion = (JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }).version;
 
 function textResult(payload: unknown): CallToolResult {
 	return { content: [{ type: 'text', text: JSON.stringify(payload) }] };

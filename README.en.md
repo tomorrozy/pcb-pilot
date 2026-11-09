@@ -4,7 +4,7 @@ Give AI agents real hands to design PCBs in **JLCEDA Pro / EasyEDA Pro**.
 
 Claude Code, Codex, DeepSeek Harness, Qoder and any MCP-capable agent can create projects, search the LCSC library, place parts, wire schematics, lay out and route PCBs, run DRC, and export Gerber/BOM — through typed actions, not arbitrary JavaScript.
 
-> Requires the **desktop Pro client** (the standard/web edition has no extension API). Targets **offline/local projects**. Daemon / CLI / MCP run on **Windows, macOS and Linux** (CI covers all three); the real-machine EDA loop has only been exercised on Windows so far — verify macOS/Linux yourself with `docs/platforms.md`.
+> Requires the **desktop Pro client** (the standard/web edition has no extension API). Targets **offline/local projects**. Daemon / CLI / MCP code and tests cover **Windows, macOS and Linux** (the three-OS CI matrix is configured but has not run yet — the repo has no remote); the real-machine EDA loop has only been exercised on Windows so far — verify macOS/Linux yourself with `docs/platforms.md`.
 
 ## Architecture
 
@@ -47,11 +47,11 @@ Multiple clients can share one daemon; restarting an agent does not drop the EDA
 
 ## Platforms
 
-| Platform | Code + CI | Real EDA machine |
-|---|---|---|
-| Windows | ✅ | ⏳ smoke checklist pending |
-| macOS 11+ | ✅ | ⬜ unverified |
-| Linux 4.9+ (x64/arm64) | ✅ | ⬜ unverified |
+| Platform | Code + local tests | CI matrix | Real EDA machine |
+|---|---|---|---|
+| Windows | ✅ tests and build pass on the author's machine | ⬜ configured, never run (repo has no remote yet) | ⏳ smoke checklist pending |
+| macOS 11+ | ⬜ code path only; POSIX-only assertions are skipped on Windows | ⬜ same | ⬜ unverified |
+| Linux 4.9+ (x64/arm64) | ⬜ same | ⬜ same | ⬜ unverified |
 
 All platforms share one data dir, `~/.pcb-pilot/` (on POSIX `token` and `audit.jsonl` are tightened to `0600`, and a dir we create is `0700`), and loopback ports `127.0.0.1:49630/49631`. The client is located by checking `PCBP_EDA_DIR` → the platform's default install dirs → a `lceda-pro` entry on `PATH`; a miss is reported as `!` and never fails `doctor`, because the authoritative signal is the extension being connected. macOS Gatekeeper, Linux zip layout and the online/half-offline re-import caveat are covered in [`docs/platforms.md`](docs/platforms.md).
 

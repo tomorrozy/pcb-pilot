@@ -21,7 +21,7 @@
 
 ## 2. 安装扩展
 
-- [ ] 从 Release 下载 `pcb-pilot-bridge_v0.1.0.eext`
+- [ ] 从 Release 下载 `pcb-pilot-bridge_v*.eext`（连上后 `pcb-pilot status` 会显示扩展版本）
 - [ ] EDA 扩展管理器安装并启用
 - [ ] 打开「允许外部交互」
 - [ ] 打开一个原理图文档

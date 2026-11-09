@@ -63,3 +63,8 @@ it('status 工具返回 extensionConnected:true', async () => {
 	const content = res.content as Array<{ type: string; text: string }>;
 	expect(JSON.parse(content[0].text).extensionConnected).toBe(true);
 });
+
+it('MCP server 上报的版本跟随 package.json', () => {
+	const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string };
+	expect(client.getServerVersion()?.version).toBe(pkg.version);
+});

@@ -28,10 +28,12 @@ jobs:
             extension/package-lock.json
       - run: npm ci
       - run: npm ci --prefix extension
-      - run: npx vitest run
-      - run: npm test --prefix extension
+      - run: npm run typecheck
+      - run: npm run typecheck --prefix extension
       - run: npm run build
       - run: npm run check:bin
+      - run: npx vitest run
+      - run: npm test --prefix extension
 
   release:
     needs: verify
@@ -53,7 +55,16 @@ jobs:
       - run: npm run build
       - run: npm run check:bin
       - run: npm run build --prefix extension
-      - run: npm pack
+      - name: Pack npm tarball and assert contents
+        run: |
+          tarball=$(npm pack --silent | tail -1)
+          tar -tzf "$tarball" > pack-list.txt
+          grep -qx "package/dist/cli/main.js" pack-list.txt
+          grep -qx "package/skill/SKILL.md" pack-list.txt
+          if grep -q "^package/extension/" pack-list.txt; then
+            echo "npm tarball must not contain extension/"
+            exit 1
+          fi
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

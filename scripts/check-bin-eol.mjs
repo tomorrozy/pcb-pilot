@@ -1,8 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
 
 const file = fileURLToPath(new URL('../dist/cli/main.js', import.meta.url));
+if (!existsSync(file)) {
+	console.error(`${file} 不存在 —— 先运行 npm run build 再校验 bin`);
+	process.exit(1);
+}
 const text = readFileSync(file, 'utf8');
 const firstLine = text.split('\n')[0];
 

@@ -83,7 +83,7 @@ it('ensureDaemon 拉起真实 daemon 并返回 status', async () => {
 	const client = new DaemonClient({ homeDir, env: { PCBP_HOME: homeDir, PCBP_WS_PORT: String(wsPort), PCBP_RPC_PORT: String(rpcPort) } as NodeJS.ProcessEnv });
 	const status = await client.ensureDaemon();
 	pid = status.pid;
-	expect(status.daemonVersion).toBe('0.1.0');
+	expect(status.daemonVersion).toBe(pkgVersion());
 	expect(status.wsPort).toBe(wsPort);
 	expect(status.extensionConnected).toBe(false);
 
@@ -104,9 +104,13 @@ it('ensureDaemon 拉起真实 daemon 并返回 status', async () => {
 	expect(JSON.parse(audit[audit.length - 1]).action).toBe('sch.listNets');
 });
 
+function pkgVersion(): string {
+	return (JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }).version;
+}
+
 function writePidFile(homeDir: string, pid: number, [rpcPort, wsPort]: number[]): string {
 	const file = join(homeDir, 'daemon.json');
-	writeFileSync(file, JSON.stringify({ pid, rpcPort, wsPort, version: '0.1.0', startedAt: new Date().toISOString() }));
+	writeFileSync(file, JSON.stringify({ pid, rpcPort, wsPort, version: pkgVersion(), startedAt: new Date().toISOString() }));
 	return file;
 }
 
