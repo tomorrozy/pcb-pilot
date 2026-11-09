@@ -61,7 +61,7 @@ it('runDoctor darwin：PCBP_EDA_DIR 命中时报告客户端路径与来源', as
 it('runDoctor linux：探不到 EDA 客户端只算提示项，不计入失败', async () => {
 	const home = tempDir('pcbp-home-');
 	const logs: string[] = [];
-	await runDoctor({
+	const code = await runDoctor({
 		homeDir: join(home, '.pcb-pilot'),
 		userHome: home,
 		platform: 'linux',
@@ -72,6 +72,24 @@ it('runDoctor linux：探不到 EDA 客户端只算提示项，不计入失败',
 	expect(line!.startsWith('!')).toBe(true);
 	expect(logs.filter(l => l.startsWith('✗')).some(l => l.includes('EDA客户端'))).toBe(false);
 	expect(logs.join('\n')).toContain('PCBP_EDA_DIR');
+	// 这里唯一让 doctor 失败的是 daemon/Skill 未就绪，EDA 目录探测不参与退出码
+	expect(code).toBe(1);
+});
+
+it('runDoctor：PCBP_EDA_DIR 指错时点名该变量，不再让用户重设同一个值', async () => {
+	const home = tempDir('pcbp-home-');
+	const bad = join(home, 'no-such-eda-dir');
+	const logs: string[] = [];
+	await runDoctor({
+		homeDir: join(home, '.pcb-pilot'),
+		userHome: home,
+		platform: 'linux',
+		env: { PCBP_EDA_DIR: bad } as NodeJS.ProcessEnv,
+		log: s => logs.push(s),
+	});
+	const idx = logs.findIndex(l => l.includes('EDA客户端'));
+	expect(logs[idx + 1]).toContain('PCBP_EDA_DIR 指向的目录不存在');
+	expect(logs[idx + 1]).toContain(bad);
 });
 
 it('runStatus 无 daemon 时 exit 1', async () => {

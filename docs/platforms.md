@@ -43,6 +43,7 @@ pcb-pilot 由三部分组成：本机 daemon（Node）、MCP/CLI 适配器（同
 ## 三平台共通
 
 - 数据目录统一是 `~/.pcb-pilot/`（`token`、`audit.jsonl`、`daemon.json`、`output/`、可选 `config.json`），不随平台改路径；用 `PCBP_HOME` 可整体迁移。
+- `PCBP_EDA_DIR` 是**首选**而不是强制：它指向的目录不存在时，`doctor` 会点名这个变量（说明值写错了），然后继续按默认目录 → PATH 探测，不会因此卡住。
 - POSIX 上数据目录权限收紧为 `0700`、token 为 `0600`（daemon 启动时会自动纠正已有的宽松权限）。
 - 端口默认 `49630`（WS）/ `49631`（RPC），只绑 `127.0.0.1`；可用 `PCBP_WS_PORT` / `PCBP_RPC_PORT` 覆盖。
 - daemon 后台化：`pcb-pilot start` 之后父进程退出、终端关闭都不影响 daemon；daemon 被强杀（`kill -9` / 任务管理器结束进程）后，下一次 `pcb-pilot status` 会报未运行并清掉陈旧的 `daemon.json`。

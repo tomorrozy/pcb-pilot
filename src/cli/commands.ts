@@ -61,13 +61,26 @@ export async function runDoctor(opts: CommandOptions = {}): Promise<number> {
 	results.push({ level: nodeOk ? 'ok' : 'fail', label: `Node.js ${process.versions.node} (要求 >= 20.17)`, hint: nodeOk ? undefined : '升级 Node.js 到 20.17 以上' });
 
 	const eda = findEdaClient({ platform, env, home: userHome });
-	results.push(eda.found
-		? { level: 'ok', label: `EDA客户端 ${eda.path}（来源 ${eda.source}）` }
-		: {
+	const edaEnvMismatch = Boolean(env.PCBP_EDA_DIR) && env.PCBP_EDA_DIR !== eda.path;
+	if (eda.found && !edaEnvMismatch)
+		results.push({ level: 'ok', label: `EDA客户端 ${eda.path}（来源 ${eda.source}）` });
+	else {
+		const hints: Array<string> = [];
+		if (edaEnvMismatch)
+			hints.push(`PCBP_EDA_DIR 指向的目录不存在（${env.PCBP_EDA_DIR}）`);
+		if (eda.found)
+			hints.push(`已回退到 ${eda.path}（来源 ${eda.source}）`);
+		else
+			hints.push(`候选 ${eda.candidates.slice(0, 4).join(' | ')}`);
+		hints.push(platformNotes(platform));
+		results.push({
 			level: 'warn',
-			label: 'EDA客户端 未探测到（扩展连上即视为可用，不影响 agent 链路）',
-			hint: `候选 ${eda.candidates.slice(0, 4).join(' | ')}；${platformNotes(platform)}`,
+			label: eda.found
+				? `EDA客户端 ${eda.path}（来源 ${eda.source}）`
+				: 'EDA客户端 未探测到（扩展连上即视为可用，不影响 agent 链路）',
+			hint: hints.join('；'),
 		});
+	}
 
 	let daemonStatus: Awaited<ReturnType<DaemonClient['status']>> | undefined;
 	try {

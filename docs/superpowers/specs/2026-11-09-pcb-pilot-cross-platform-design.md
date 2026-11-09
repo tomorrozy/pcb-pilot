@@ -54,7 +54,8 @@ v0.1 的 README 路线图第 1 项是「macOS / Linux 支持」。本次升级�
   - darwin：`/Applications/LCEDA-Pro.app` → `~/Applications/LCEDA-Pro.app` → `/Applications/lceda-pro.app` → `/Applications/嘉立创EDA专业版.app`。
   - linux：`/opt/lceda-pro` → `/usr/local/lceda-pro` → `~/.local/share/lceda-pro` → `~/lceda-pro` → `/snap/lceda-pro/current`。
   - 三平台共同尾部：PATH 里名为 `lceda-pro`（win32 加 `.exe`）的可执行文件所在目录 —— 官方安装器承诺的信号。
-- `findEdaClient({platform, env, home}): {found, path?, source: 'env'|'dir'|'path'|'none', candidates: string[]}`；`env.PCBP_EDA_DIR` 优先（v0.1 契约不变）。
+- `findEdaClient({platform, env, home}): {found, path?, source: 'env'|'dir'|'path'|'none', candidates: string[]}`；`env.PCBP_EDA_DIR` 排在候选表首位，但**不独占**：它不存在时继续按默认目录 → PATH 探测（v0.1「可覆盖」契约不变，且避免 doctor 反过来建议用户去设一个已经设错的变量）。目录判定用 `statSync`（跟随符号链接），软链接安装的客户端也算命中。
+- 路径拼接按**注入的 platform** 选 `path.win32` / `path.posix`，不用宿主的 `path.join`/`delimiter`：否则在 Windows 上跑的 darwin/linux 断言只是拿 Windows 方言自证，跨平台分支等于没测。
 - 纯函数 + 注入的 `exists/isFile` 回调，测试不需要真装 EDA。
 
 ### 6.2 doctor 语义调整（有意的行为变更）

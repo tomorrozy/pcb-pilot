@@ -1,6 +1,6 @@
-import { existsSync, lstatSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { posix, win32 } from 'node:path';
 
 export type EdaClientSource = 'env' | 'dir' | 'path' | 'none';
 
@@ -24,29 +24,36 @@ export interface EdaClientLookup {
 	candidates: string[];
 }
 
+// 探测非本机平台时（CI 矩阵、单测注入 platform），路径必须按目标平台的分隔符拼接，否则断言只是在本机方言里自证
+function pathApi(platform: NodeJS.Platform): typeof posix {
+	return platform === 'win32' ? win32 : posix;
+}
+
 function staticDirs(platform: NodeJS.Platform, env: NodeJS.ProcessEnv, home: string): Array<string> {
+	const p = pathApi(platform);
 	if (platform === 'win32') {
 		const dirs: Array<string> = [];
 		if (env.LOCALAPPDATA)
-			dirs.push(join(env.LOCALAPPDATA, 'Programs', 'lceda-pro'));
+			dirs.push(p.join(env.LOCALAPPDATA, 'Programs', 'lceda-pro'));
 		for (const key of ['PROGRAMFILES', 'PROGRAMFILES(X86)', 'ProgramFiles', 'ProgramFiles (x86)']) {
 			if (env[key])
-				dirs.push(join(env[key], 'lceda-pro'));
+				dirs.push(p.join(env[key], 'lceda-pro'));
 		}
 		return dirs;
 	}
 	if (platform === 'darwin')
-		return ['/Applications/LCEDA-Pro.app', join(home, 'Applications', 'LCEDA-Pro.app'), '/Applications/lceda-pro.app', '/Applications/嘉立创EDA专业版.app'];
-	return ['/opt/lceda-pro', '/usr/local/lceda-pro', join(env.XDG_DATA_HOME ?? join(home, '.local', 'share'), 'lceda-pro'), join(home, 'lceda-pro'), '/snap/lceda-pro/current'];
+		return ['/Applications/LCEDA-Pro.app', p.join(home, 'Applications', 'LCEDA-Pro.app'), '/Applications/lceda-pro.app', '/Applications/嘉立创EDA专业版.app'];
+	return ['/opt/lceda-pro', '/usr/local/lceda-pro', p.join(env.XDG_DATA_HOME ?? p.join(home, '.local', 'share'), 'lceda-pro'), p.join(home, 'lceda-pro'), '/snap/lceda-pro/current'];
 }
 
 function pathDirs(env: NodeJS.ProcessEnv, platform: NodeJS.Platform, exists: (p: string) => boolean): Array<string> {
+	const p = pathApi(platform);
 	const names = platform === 'win32' ? ['lceda-pro.exe', 'lceda-pro'] : ['lceda-pro'];
 	const dirs: Array<string> = [];
-	for (const dir of (env.PATH ?? env.Path ?? '').split(delimiter)) {
+	for (const dir of (env.PATH ?? env.Path ?? '').split(p.delimiter)) {
 		if (!dir)
 			continue;
-		if (names.some(name => exists(join(dir, name))))
+		if (names.some(name => exists(p.join(dir, name))))
 			dirs.push(dir);
 	}
 	return dirs;
@@ -62,10 +69,8 @@ export function edaClientEntries(opts: EdaClientLookupOptions = {}): Array<EdaCl
 		if (path && !entries.some(e => e.path === path))
 			entries.push({ path, source });
 	};
-	if (env.PCBP_EDA_DIR) {
+	if (env.PCBP_EDA_DIR)
 		push(env.PCBP_EDA_DIR, 'env');
-		return entries;
-	}
 	for (const dir of staticDirs(platform, env, home))
 		push(dir, 'dir');
 	for (const dir of pathDirs(env, platform, exists))
@@ -80,7 +85,7 @@ export function edaClientCandidates(opts: EdaClientLookupOptions = {}): Array<st
 export function findEdaClient(opts: EdaClientLookupOptions = {}): EdaClientLookup {
 	const isDirectory = opts.isDirectory ?? ((p: string) => {
 		try {
-			return lstatSync(p).isDirectory();
+			return statSync(p).isDirectory();
 		}
 		catch {
 			return false;
