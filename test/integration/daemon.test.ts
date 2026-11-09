@@ -1,6 +1,6 @@
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { AuditLogger } from '../../src/daemon/audit.js';
 import { ExtensionBridge } from '../../src/daemon/bridge.js';
@@ -167,6 +167,26 @@ it('output.* 文件名防目录穿越', async () => {
 	expect(res.ok).toBe(true);
 	expect((res.result as { path: string }).path.startsWith(paths.outputDir)).toBe(true);
 	expect((res.result as { path: string }).path.endsWith('evil.zip')).toBe(true);
+});
+
+it('output.* 文件名防目录穿越（POSIX 形式）', async () => {
+	const { paths, bridge, url } = await setup();
+	const mock = await connectMock(url);
+	mock.onAction(async () => ({ ok: true, result: { fileName: '../../escape/gerber.zip', base64: 'AAAA', sizeBytes: 3 } }));
+	const res = await bridge.dispatch('output.gerber', {});
+	expect(res.ok).toBe(true);
+	const out = (res.result as { path: string }).path;
+	expect(out.startsWith(paths.outputDir)).toBe(true);
+	expect(resolve(out)).toBe(join(paths.outputDir, 'gerber.zip'));
+});
+
+it('output.* 绝对文件名只取末段', async () => {
+	const { paths, bridge, url } = await setup();
+	const mock = await connectMock(url);
+	mock.onAction(async () => ({ ok: true, result: { fileName: '/var/tmp/x.zip', base64: 'AAAA', sizeBytes: 3 } }));
+	const res = await bridge.dispatch('output.bom', {});
+	expect(res.ok).toBe(true);
+	expect(resolve((res.result as { path: string }).path)).toBe(join(paths.outputDir, 'x.zip'));
 });
 
 it('project.open/create 成功后刷新 projectUuid 缓存', async () => {
