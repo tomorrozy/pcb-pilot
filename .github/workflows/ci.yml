@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install root deps
+        run: npm ci
+      - name: Install extension deps
+        run: npm ci --prefix extension
+      - name: Typecheck (root + extension)
+        run: |
+          npm run typecheck
+          npm run typecheck --prefix extension
+      - name: Test (root + extension)
+        run: |
+          npx vitest run
+          npm test --prefix extension
+      - name: Build package
+        run: npm run build
+      - name: Build .eext
+        run: npm run build --prefix extension
+      - name: Upload .eext
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcb-pilot-eext
+          path: extension/build/dist/*.eext
+      - name: Pack npm tarball
+        run: npm pack
+      - name: Upload npm tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcb-pilot-npm
+          path: pcb-pilot-*.tgz

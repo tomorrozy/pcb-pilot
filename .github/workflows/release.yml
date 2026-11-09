@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix extension
+      - run: npm run build
+      - run: npx vitest run
+      - run: npm test --prefix extension
+      - run: npm run build --prefix extension
+      - name: Pack npm tarball
+        run: npm pack
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            extension/build/dist/*.eext
+            pcb-pilot-*.tgz
+          generate_release_notes: true
