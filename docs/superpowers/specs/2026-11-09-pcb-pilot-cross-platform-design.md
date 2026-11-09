@@ -106,4 +106,4 @@ v0.1 的 README 路线图第 1 项是「macOS / Linux 支持」。本次升级�
   - 候选路径按**目标平台**方言拼接（`path.win32`/`path.posix`）：否则在 Windows 上跑的非 Windows 分支断言毫无意义。
   - 权限收紧对象从「数据目录」改为「token 与 audit.jsonl 文件」：`PCBP_HOME` 可以是用户自选的共享目录，改其权限属于越权；POSIX 下 0755 目录只暴露文件名，0600 文件才拦住内容。新建目录仍给 0700。
   - 损坏 pidfile 的清理加 5s mtime 观察期；同时把子进程输出改为追加 `<dataDir>/daemon.log`（取代 `stdio:'ignore'`）—— 后台 daemon 启动失败的原因不该永久丢失。
-  - 三平台 CI 与真机状态一律按「配置了但未实跑」表述：仓库还没有远端，矩阵一次都没跑过，不能写成 ✅。
+  - 三平台 CI 与真机状态一律按「配置了但未实跑」表述：仓库还没有远端，矩阵一次都没跑过，不能写成 ✅。（2026-11-09 首跑 [run 42576710403](https://github.com/tomorrozy/pcb-pilot/actions/runs/42576710403) 三平台全绿、POSIX 用例实跑后，文档口径上调为 CI ✅；EDA 真机列仍保持未验证。）

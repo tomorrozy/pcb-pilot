@@ -6,11 +6,11 @@ pcb-pilot 由三部分组成：本机 daemon（Node）、MCP/CLI 适配器（同
 
 | 平台 | 代码 + 本地测试 | CI 矩阵 | EDA 真机联调 |
 |---|---|---|---|
-| Windows | ✅ 已在作者本机跑通 typecheck/测试/构建/.eext 打包 | ⬜ 已配置 `windows-latest`，仓库接上远端后才会实跑 | ⏳ 待按 `docs/smoke-test.md` 执行 |
-| macOS | ⬜ 代码路径已实现；POSIX 专属断言在 Windows 上跳过 | ⬜ 已配置 `macos-latest`，未实跑 | ⬜ 未验证（需一台 Mac 跑冒烟清单） |
-| Linux | ⬜ 同上 | ⬜ 已配置 `ubuntu-latest`，未实跑 | ⬜ 未验证（需一台 Linux 跑冒烟清单） |
+| Windows | ✅ 已在作者本机跑通 typecheck/测试/构建/.eext 打包 | ✅ `windows-latest` 通过 | ⏳ 待按 `docs/smoke-test.md` 执行 |
+| macOS | ⬜ 本地未跑（POSIX 专属断言在 Windows 上跳过） | ✅ `macos-latest` 通过，POSIX 用例实跑 | ⬜ 未验证（需一台 Mac 跑冒烟清单） |
+| Linux | ⬜ 同上 | ✅ `ubuntu-latest` 通过（73 passed / 1 个 Windows-only 用例跳过） | ⬜ 未验证（需一台 Linux 跑冒烟清单） |
 
-> CI 只证明「我们的代码在该平台可安装、可运行、可通过测试」，而这一点目前还是**待验证**状态：矩阵已经写好但从未跑过（仓库没有远端）。EDA 扩展是否在你的 Mac/Linux 客户端里正常连上 daemon，必须由冒烟清单确认 —— 在那之前不要把某平台称作「真机可用」，也不要把 CI 矩阵称作「已通过」。
+> CI 首跑记录：[run 42576710403](https://github.com/tomorrozy/pcb-pilot/actions/runs/42576710403)，三平台全部通过（typecheck、测试、构建、bin 换行校验、npm 包内容断言、.eext 打包）。CI 只证明「代码在该平台可安装、可运行、可通过测试」；EDA 扩展是否在你的 Mac/Linux 客户端里正常连上 daemon，仍必须由冒烟清单确认 —— 在那之前不要把某平台称作「真机可用」。
 
 ## Windows
 
