@@ -10,7 +10,8 @@
 	"scripts": {
 		"compile": "rimraf ./dist/ && node ./config/esbuild.prod.ts",
 		"build": "npm run compile && node ./build/packaged.ts",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run"
 	},
 	"devDependencies": {
 		"@jlceda/pro-api-types": "^0.4.27",

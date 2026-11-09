@@ -19,5 +19,5 @@
 		"isolatedModules": true,
 		"skipLibCheck": true
 	},
-	"include": ["./src/**/*", "./test/**/*", "./node_modules/@jlceda/pro-api-types/**/*"]
+	"include": ["./src/**/*", "./test/**/*", "../src/protocol/**/*", "./node_modules/@jlceda/pro-api-types/**/*"]
 }
