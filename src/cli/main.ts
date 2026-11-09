@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import { DaemonClient } from '../daemon/client.js';
 import { startDaemon } from '../daemon/main.js';
 import { runMcpServer } from '../mcp/main.js';
-import { runDoctor, runInstall, runStatus } from './commands.js';
+import { runDoctor, runInstall, runStatus, runStop } from './commands.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string };
 const program = new Command();
@@ -19,13 +19,18 @@ program.command('serve').description('前台运行 daemon').action(async () => {
 });
 
 program.command('start').description('后台启动 daemon（已运行则复用）').action(async () => {
-	const status = await new DaemonClient().ensureDaemon();
-	console.log(`pcb-pilot daemon 运行中 (pid ${status.pid}) rpc=${status.rpcPort} ws=${status.wsPort}`);
+	try {
+		const status = await new DaemonClient().ensureDaemon();
+		console.log(`pcb-pilot daemon 运行中 (pid ${status.pid}) rpc=${status.rpcPort} ws=${status.wsPort}`);
+	}
+	catch (err) {
+		console.error(`✗ ${err instanceof Error ? err.message : String(err)}`);
+		process.exitCode = 1;
+	}
 });
 
 program.command('stop').description('停止 daemon').action(async () => {
-	await new DaemonClient().shutdown();
-	console.log('pcb-pilot daemon 已停止');
+	process.exitCode = await runStop();
 });
 
 program.command('status').description('查看 daemon 与 EDA 扩展状态').action(async () => {

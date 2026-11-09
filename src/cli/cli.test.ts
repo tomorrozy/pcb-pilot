@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { runDoctor, runStatus } from './commands.js';
+import { runDoctor, runStatus, runStop } from './commands.js';
 import { defaultTargets, installSkill, registrationSnippets } from './install.js';
 
 function tempDir(prefix: string): string {
@@ -90,6 +90,24 @@ it('runDoctor：PCBP_EDA_DIR 指错时点名该变量，不再让用户重设同
 	const idx = logs.findIndex(l => l.includes('EDA客户端'));
 	expect(logs[idx + 1]).toContain('PCBP_EDA_DIR 指向的目录不存在');
 	expect(logs[idx + 1]).toContain(bad);
+});
+
+it('runStop：数据目录什么都没有时报告已停止', async () => {
+	const home = tempDir('pcbp-home-');
+	const logs: string[] = [];
+	expect(await runStop({ homeDir: join(home, '.pcb-pilot'), log: s => logs.push(s) })).toBe(0);
+	expect(logs.join('\n')).toContain('已停止');
+});
+
+it('runStop：陈旧 pidfile 要说清是「清理」而不是「已停止」', async () => {
+	const dir = join(tempDir('pcbp-home-'), '.pcb-pilot');
+	mkdirSync(dir, { recursive: true });
+	const file = join(dir, 'daemon.json');
+	writeFileSync(file, JSON.stringify({ pid: 2 ** 31, rpcPort: 1, wsPort: 1, version: '0', startedAt: '' }));
+	const logs: string[] = [];
+	expect(await runStop({ homeDir: dir, log: s => logs.push(s) })).toBe(0);
+	expect(logs.join('\n')).toContain('陈旧');
+	expect(existsSync(file)).toBe(false);
 });
 
 it('runStatus 无 daemon 时 exit 1', async () => {

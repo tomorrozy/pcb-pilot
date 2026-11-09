@@ -46,7 +46,9 @@ pcb-pilot 由三部分组成：本机 daemon（Node）、MCP/CLI 适配器（同
 - `PCBP_EDA_DIR` 是**首选**而不是强制：它指向的目录不存在时，`doctor` 会点名这个变量（说明值写错了），然后继续按默认目录 → PATH 探测，不会因此卡住。
 - POSIX 上敏感文件收紧到 `0600`（`token` 与 `audit.jsonl`，daemon 启动时会自动纠正已有的宽松权限），由本工具新建的数据目录是 `0700`；已经存在的目录不会被改动权限 —— `PCBP_HOME` 指向共享位置时那是用户的决定，文件自身权限已足以阻止他人读取。Windows 上这些 chmod 调用是无语义的 no-op，不会报错。
 - 端口默认 `49630`（WS）/ `49631`（RPC），只绑 `127.0.0.1`；可用 `PCBP_WS_PORT` / `PCBP_RPC_PORT` 覆盖。
-- daemon 后台化：`pcb-pilot start` 之后父进程退出、终端关闭都不影响 daemon；daemon 被强杀（`kill -9` / 任务管理器结束进程）后，下一次 `pcb-pilot status` 会报未运行并清掉陈旧的 `daemon.json`。
+- daemon 后台化：`pcb-pilot start` 之后父进程退出、终端关闭都不影响 daemon；daemon 被强杀（`kill -9` / 任务管理器结束进程）后，下一次 `pcb-pilot status` 会报未运行并清掉陈旧的 `daemon.json`（写坏且已陈旧的文件同样会被清理；刚刚写过的不动，避免误删正在启动的 daemon）。
+- daemon 的启动输出与失败原因都追加到 `~/.pcb-pilot/daemon.log`（POSIX 上 `0600`）。`pcb-pilot start` 失败时报错里带这个路径；端口被占用（EADDRINUSE）在这三平台上都能看到原始堆栈。
+- `pcb-pilot stop` 如实区分三种结果：已停止、进程早就不在了所以清理了 pidfile、进程还在但不响应（后者退出码为 1，并让你去看 `daemon.log`；本工具不会替你强杀任意 pid）。
 - **在线模式与半离线/离线模式的扩展存储互不共用**：切换 EDA 运行模式后，需要在新模式下重新导入 `.eext` 并重新填一次 token。
 
 ## 已知限制

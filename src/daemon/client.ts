@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { BridgeStatus } from './bridge.js';
 import type { DaemonPaths } from './paths.js';
@@ -8,6 +8,8 @@ import type { ActionResponse } from '../protocol/types.js';
 import { getActionDef } from '../protocol/actions.js';
 
 export type DaemonStatus = BridgeStatus & { daemonVersion: string; pid: number; rpcPort: number; wsPort: number };
+
+export type ShutdownResult = 'stopped' | 'stale-cleaned' | 'still-running';
 
 interface DaemonFile {
 	pid: number;
@@ -30,14 +32,15 @@ function resolveDaemonMain(): string {
 }
 
 export function isPidAlive(pid: number): boolean {
-	if (!Number.isInteger(pid) || pid <= 0)
+	if (!Number.isSafeInteger(pid) || pid <= 0)
 		return false;
 	try {
 		process.kill(pid, 0);
 		return true;
 	}
 	catch (err) {
-		return (err as NodeJS.ErrnoException).code !== 'ESRCH';
+		// 只有 EPERM 说明「进程在、只是没权限探它」；其余（含非法 pid）一律按不存在处理
+		return (err as NodeJS.ErrnoException).code === 'EPERM';
 	}
 }
 
@@ -52,8 +55,11 @@ export class DaemonClient {
 
 	async status(): Promise<DaemonStatus> {
 		const file = this.readDaemonFile();
-		if (!file)
+		if (!file) {
+			if (this.pruneIfStale())
+				throw new Error('pcb-pilot daemon is not running (stale pidfile removed)');
 			throw new Error('pcb-pilot daemon is not running');
+		}
 		let res: Record<string, unknown>;
 		try {
 			res = await this.rpc('status', undefined, 500);
@@ -84,28 +90,35 @@ export class DaemonClient {
 			return await this.status();
 		}
 		catch {}
+		const logFd = this.openDaemonLog();
 		const child = spawn(process.execPath, [resolveDaemonMain()], {
 			detached: true,
-			stdio: 'ignore',
+			stdio: ['ignore', logFd ?? 'ignore', logFd ?? 'ignore'],
 			env: { ...this.env, PCBP_HOME: this.paths.homeDir },
 		});
-		child.once('error', () => {});
+		if (logFd !== undefined)
+			closeSync(logFd);
+		let spawnError: Error | undefined;
+		// POSIX 上 spawn 失败是异步事件，不监听会让 CLI 直接崩
+		child.once('error', (err) => {
+			spawnError = err;
+			this.logSpawnFailure(err);
+		});
 		child.unref();
 		const start = Date.now();
-		let lastErr: unknown;
 		while (Date.now() - start < 5000) {
+			if (spawnError)
+				break;
 			await new Promise(r => setTimeout(r, 100));
 			try {
 				return await this.status();
 			}
-			catch (err) {
-				lastErr = err;
-			}
+			catch {}
 		}
-		throw lastErr ?? new Error('timed out waiting for daemon to start');
+		throw new Error(`pcb-pilot daemon 未能启动${spawnError ? `：${String(spawnError)}` : ''}。启动日志：${this.paths.daemonLogFile}`);
 	}
 
-	async shutdown(): Promise<void> {
+	async shutdown(): Promise<ShutdownResult> {
 		try {
 			await this.rpc('shutdown', undefined, 2000);
 		}
@@ -113,17 +126,56 @@ export class DaemonClient {
 		const start = Date.now();
 		while (Date.now() - start < 3000) {
 			if (!existsSync(this.paths.daemonFile))
-				return;
+				return 'stopped';
 			if (this.pruneIfStale())
-				return;
+				return 'stale-cleaned';
 			await new Promise(r => setTimeout(r, 100));
 		}
-		this.pruneIfStale();
+		if (this.pruneIfStale())
+			return 'stale-cleaned';
+		return existsSync(this.paths.daemonFile) ? 'still-running' : 'stopped';
 	}
 
-	private pruneIfStale(): boolean {
-		const file = this.readDaemonFile();
-		if (!file || isPidAlive(file.pid))
+	// 子进程的 stdout/stderr 落到数据目录：否则 stdio:'ignore' 下 daemon 启动失败的原因永久丢失
+	private openDaemonLog(): number | undefined {
+		try {
+			mkdirSync(this.paths.homeDir, { recursive: true });
+			return openSync(this.paths.daemonLogFile, 'a', 0o600);
+		}
+		catch {
+			return undefined;
+		}
+	}
+
+	private logSpawnFailure(err: Error): void {
+		try {
+			appendFileSync(this.paths.daemonLogFile, `[spawn] ${String(err)}\n`);
+		}
+		catch {}
+	}
+
+	// 只清理「确认已死」或「解析不了且不是刚写的」pidfile；绝不给任意 pid 发信号（pid 复用会误杀别的进程）
+	private pruneIfStale(staleAfterMs = 5000): boolean {
+		let raw: string;
+		let mtimeMs = Number.NaN;
+		try {
+			raw = readFileSync(this.paths.daemonFile, 'utf8');
+			mtimeMs = statSync(this.paths.daemonFile).mtimeMs;
+		}
+		catch {
+			return false;
+		}
+		let pid: unknown;
+		try {
+			pid = (JSON.parse(raw) as DaemonFile).pid;
+		}
+		catch {
+			pid = undefined;
+		}
+		if (Number.isSafeInteger(pid) && isPidAlive(pid as number))
+			return false;
+		// pid 缺失/损坏时可能是别人刚写了一半：给一个最短观察期，别抢在写入过程中删掉
+		if (!Number.isSafeInteger(pid) && Date.now() - mtimeMs < staleAfterMs)
 			return false;
 		try {
 			unlinkSync(this.paths.daemonFile);

@@ -116,6 +116,22 @@ export async function runDoctor(opts: CommandOptions = {}): Promise<number> {
 	return results.some(r => r.level === 'fail') ? 1 : 0;
 }
 
+export async function runStop(opts: CommandOptions = {}): Promise<number> {
+	const log = opts.log ?? console.log;
+	const paths = getPaths(opts.homeDir);
+	const result = await new DaemonClient({ homeDir: opts.homeDir }).shutdown();
+	if (result === 'stopped')
+		log('✓ pcb-pilot daemon 已停止');
+	else if (result === 'stale-cleaned')
+		log(`✓ daemon 进程已不在，清理了陈旧的 ${paths.daemonFile}`);
+	else {
+		log('✗ daemon 进程还在，但没有响应停止请求');
+		log(`    → 查看 ${paths.daemonLogFile}；确认后可以手动结束进程（本工具不会替你强杀任意 pid）`);
+		return 1;
+	}
+	return 0;
+}
+
 export async function runInstall(opts: CommandOptions = {}): Promise<number> {
 	const log = opts.log ?? console.log;
 	const userHome = opts.userHome ?? homedir();

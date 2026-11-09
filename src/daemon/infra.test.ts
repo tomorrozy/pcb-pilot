@@ -105,6 +105,11 @@ it('restrictToOwner 三平台通用：缺失即建、已存在只改权限不动
 	expect(() => restrictToOwner(join(dir, 'nested', 'deep.jsonl'))).not.toThrow();
 });
 
+it('getPaths 暴露 daemon 启动日志路径', () => {
+	const paths = getPaths(tempHome());
+	expect(paths.daemonLogFile).toBe(join(paths.homeDir, 'daemon.log'));
+});
+
 it('AuditLogger 自动建目录并追加 JSONL', () => {
 	const dir = tempHome();
 	const file = join(dir, 'nested', 'audit.jsonl');

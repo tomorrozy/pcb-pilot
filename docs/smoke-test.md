@@ -12,10 +12,12 @@
 ## 1. daemon
 
 - [ ] `pcb-pilot start` → 输出 `daemon 运行中 (pid …)`
-- [ ] `pcb-pilot status` → 全部 ✓（此时扩展未连，最后一项 ✗ 是预期）
-- [ ] `pcb-pilot stop` → 再 `start`，`~/.pcb-pilot/daemon.json` 重建
+- [ ] `pcb-pilot status` → `✓ daemon 运行中`；扩展未连时 `✗ EDA 扩展未连接`，退出码 1（这是本步的预期，不是 daemon 坏了）
+- [ ] `pcb-pilot stop` → 输出「已停止」；再 `start`，`~/.pcb-pilot/daemon.json` 重建
 - [ ] 强杀 daemon（POSIX `kill -9 <pid>` / Windows 任务管理器「结束进程」）→ `pcb-pilot status` 报未运行，且陈旧的 `~/.pcb-pilot/daemon.json` 被自动清理，再 `start` 可恢复
+- [ ] 端口被占用时的可诊断性：先占住 WS 端口（如 `nc -l 127.0.0.1 49630` / `python -m http.server 49630`），再 `PCBP_HOME=$(mktemp -d) pcb-pilot start` → 报错里带 `daemon.log` 路径，且 `~/.pcb-pilot/daemon.log` 里有 `EADDRINUSE` 原始堆栈
 - [ ] `pcb-pilot doctor`：`PCBP_EDA_DIR` 指向真实客户端目录时 EDA 客户端项为 ✓；不设该变量时该项是 `!`（提示）而不是 ✗，且不影响退出码
+- [ ] `PCBP_EDA_DIR` 指到一个不存在的目录 → 该项为 `!`，提示里点名「PCBP_EDA_DIR 指向的目录不存在（…）」，而不是让你再去设同一个变量
 
 ## 2. 安装扩展
 

@@ -7,6 +7,7 @@ export interface DaemonPaths {
 	tokenFile: string;
 	auditFile: string;
 	daemonFile: string;
+	daemonLogFile: string;
 	outputDir: string;
 	configFile: string;
 }
@@ -18,6 +19,7 @@ export function getPaths(homeDir?: string): DaemonPaths {
 		tokenFile: join(dir, 'token'),
 		auditFile: join(dir, 'audit.jsonl'),
 		daemonFile: join(dir, 'daemon.json'),
+		daemonLogFile: join(dir, 'daemon.log'),
 		outputDir: join(dir, 'output'),
 		configFile: join(dir, 'config.json'),
 	};

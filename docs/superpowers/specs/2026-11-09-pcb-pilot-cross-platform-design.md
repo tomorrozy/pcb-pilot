@@ -64,10 +64,11 @@ v0.1 的 README 路线图第 1 项是「macOS / Linux 支持」。本次升级�
 - 非 Windows 不再打印「跳过检查」，而是给出该平台候选路径与 Gatekeeper/AppImage 提示。
 
 ### 6.3 daemon 生命周期
-- `isPidAlive(pid)`：`process.kill(pid, 0)`；`ESRCH` → 死，`EPERM` → 活（Unix 上属于别人的进程也算活，交给 RPC 探活兜底）。
+- `isPidAlive(pid)`：`process.kill(pid, 0)`；**只有 `EPERM` 视为存活**（Unix 上属于别人的进程也算活，交给 RPC 探活兜底），`ESRCH` 与任何其它错误（含 Node 对非法 pid 抛的 `ERR_INVALID_ARG_TYPE`）一律视为不存在；非 `Number.isSafeInteger` 或 `<= 0` 直接判死。
 - `DaemonClient.status()`：先探 RPC；失败且 pid 已死 → **删除陈旧 `daemon.json`** 后抛「daemon 未运行」；pid 活着但 RPC 不通 → 保留文件（可能正在启动）。
-- `shutdown()`：RPC 后等文件消失；3s 内未消失但 pid 已死 → 清理文件。不给任意 pid 发信号（避免 pid 复用误杀）。
-- `ensureDaemon()`：给 spawn 子进程挂 `error` 监听（POSIX 上 spawn 失败是异步事件，未监听会让 CLI 直接崩），并保持 detached + `unref()` + `stdio:'ignore'`（三平台父进程退出后存活）。
+- 无法解析的 `daemon.json`（写坏/被截断）同样走清理，但加 **mtime 最短观察期（5s）**：pid 字段拿不到时，只清理「不是刚刚写过」的文件，避免抢在另一个 daemon 的写入过程中把它删掉。
+- `shutdown()` 返回 `'stopped' | 'stale-cleaned' | 'still-running'`：RPC 后等文件消失；3s 内未消失但 pid 已死 → 清理文件；进程还在且不响应 → 如实返回 `still-running`，`pcb-pilot stop` 据此 exit 1 并指向 `daemon.log`。不给任意 pid 发信号（避免 pid 复用误杀）。
+- `ensureDaemon()`：给 spawn 子进程挂 `error` 监听（POSIX 上 spawn 失败是异步事件，未监听会让 CLI 直接崩），把错误同时记进 `daemon.log`；子进程的 stdout/stderr 由 `stdio:'ignore'` 改为追加到 `<dataDir>/daemon.log`（`0600`），否则 daemon 启动失败（端口被占等）的原因永久丢失。保持 detached + `unref()`。
 
 ### 6.4 Unix 发布正确性
 - `tsconfig.json` 加 `"newLine": "lf"`；新增 `.gitattributes`（`* text=auto eol=lf`，`.eext`/图片标 binary）。
