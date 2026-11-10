@@ -3,7 +3,7 @@
 	"uuid": "b3077951fb9b4b8a9c1bcf279b7d7024",
 	"displayName": "PCB Pilot 电路板助手",
 	"description": "MCP bridge for AI agents to drive JLCEDA / EasyEDA Pro — 让 AI agent 操控嘉立创EDA画板",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"publisher": "tomorrozy",
 	"engines": {
 		"eda": "^3.2.0"
@@ -24,7 +24,9 @@
 	},
 	"homepage": "https://github.com/tomorrozy/pcb-pilot",
 	"bugs": "https://github.com/tomorrozy/pcb-pilot/issues",
-	"activationEvents": {},
+	"activationEvents": {
+		"onStartupFinished": true
+	},
 	"entry": "./dist/index",
 	"dependentExtensions": {},
 	"headerMenus": {

@@ -82,7 +82,7 @@ v1 面向离线/本地工程：`project.create` 不依赖云端 team，工程落
 
 | 平台 | 代码 + 本地测试 | CI 矩阵 | EDA 真机 |
 |---|---|---|---|
-| Windows | ✅ 已在作者本机跑通测试与构建 | ✅ `windows-latest` 通过 | ⏳ 待跑冒烟清单 |
+| Windows | ✅ 已在作者本机跑通测试与构建 | ✅ `windows-latest` 通过 | ✅ 冒烟清单 §1–§7 通过（2026-11-10，V4.1.78 半离线） |
 | macOS（11+） | ⬜ 仅代码路径（POSIX 专属断言在 Windows 上跳过） | ✅ `macos-latest` 通过，POSIX 用例实跑 | ⬜ 未验证 |
 | Linux（4.9+，x64/arm64） | ⬜ 同上 | ✅ `ubuntu-latest` 通过（73 passed / 1 个 Windows-only 跳过） | ⬜ 未验证 |
 

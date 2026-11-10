@@ -2,6 +2,17 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；版本号遵循 SemVer。
 
+## [0.3.1] - 2026-11-10
+
+### 修复
+
+- 扩展自动激活：`activationEvents` 由空对象改为 `onStartupFinished`。v0.3.0 的 .eext 在客户端重启后需要手动点一次菜单才激活；现在客户端启动完成即自动连接 daemon（Windows V4.1.78 真机验证）。
+
+### 文档
+
+- Windows 真机冒烟清单 §1–§7 全部通过（2026-11-10，V4.1.78 半离线）：含切工程 READBACK_MISMATCH 锁定/拦截/重置、Gerber 九文件 zip、审计无 token 泄露、关 EDA/杀 daemon 两类断线恢复。
+- 按真机结果纠正清单口径：API 放置不自动分配位号（默认 `R?`，用 `designator` 参数或 `sch_modifyComponent` 指定）；补充半离线 `library_getByLcscId` 可能返空（改用 `library_searchDevice`）、无打开文档时 `sch.*` 会等到 TIMEOUT、客户端升级后首次启动需菜单激活一次等实测注意。
+
 ## [0.3.0] - 2026-11-09
 
 ### 新增

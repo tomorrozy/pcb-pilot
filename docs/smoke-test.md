@@ -32,10 +32,15 @@
 ## 3. Agent 链路
 
 - [ ] 在 agent 里说「看下当前工程」→ 调用 `project_getStatus`，返回真实工程名/uuid
-- [ ] 「在原理图放一颗 0402 电阻」→ `sch_placeComponent` 返回 `primitiveId`，EDA 画布出现器件，位号自动分配
+- [ ] 「在原理图放一颗 0402 电阻」→ `sch_placeComponent` 返回 `primitiveId`，EDA 画布出现器件。注意：API 放置**不自动分配位号**（默认 `R?` 等），用 `designator` 参数指定或事后 `sch_modifyComponent` 修改
 - [ ] 「读回刚才的器件」→ `sch_listComponents` 能看到该器件，坐标与 readback 一致
 - [ ] 「截图看看」→ `vision_screenshot` 返回图片（agent 端可见）
 - [ ] 「跑一下原理图 DRC」→ `sch_drc` 返回真实结果
+
+实测注意（Windows / V4.1.78 / 半离线）：
+
+- 半离线模式下 `library_getByLcscId` 可能返回空（系统库未同步 LCSC 编号索引）；改用 `library_searchDevice` 按型号/参数搜索可命中。
+- 当前工程没有打开原理图文档时，`sch.*` 动作会挂起等到 `TIMEOUT`（EDA API 行为）；先按第 2 节打开文档再操作。
 
 ## 4. 切工程防护
 
@@ -53,7 +58,7 @@
 ## 6. 断线恢复
 
 - [ ] 关掉 EDA → `pcb-pilot status` 显示扩展未连接
-- [ ] 重开 EDA、打开文档、菜单重连 → agent 再次调用成功
+- [ ] 重开 EDA、打开文档、菜单重连 → agent 再次调用成功（正常重启时扩展会自动连接，无需菜单；客户端**升级后首次启动**若未自动连接，菜单 PCB Pilot → 重连 激活一次即可）
 - [ ] 杀掉 daemon（`pcb-pilot stop`）后 agent 再调用 → 返回 `NOT_CONNECTED`，`pcb-pilot start` 后恢复
 
 ## 7. 结束

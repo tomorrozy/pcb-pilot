@@ -1,6 +1,6 @@
 {
 	"name": "pcb-pilot",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "Let AI agents (Claude Code, Codex, DeepSeek Harness, Qoder) drive JLCEDA / EasyEDA Pro via MCP — 嘉立创EDA专业版 agent 桥接包",
 	"type": "module",
 	"license": "Apache-2.0",
